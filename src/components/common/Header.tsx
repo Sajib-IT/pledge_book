@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAuth } from '../../features/auth/AuthContext';
 import { useI18n } from '../../lib/i18n';
-import { BookOpen, Globe, LogOut, Shield } from 'lucide-react';
+import { Globe, LogOut, Shield } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
 export const Header: React.FC = () => {
@@ -25,8 +25,8 @@ export const Header: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         {/* Brand Logo & Name */}
         <Link to="/" className="flex items-center gap-2.5 group">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-700 to-emerald-500 flex items-center justify-center text-white shadow-md shadow-emerald-700/20 group-hover:scale-105 transition-transform">
-            <BookOpen className="w-5 h-5" />
+          <div className="w-10 h-10 rounded-xl overflow-hidden shadow-md shadow-emerald-700/20 group-hover:scale-105 transition-transform border border-emerald-600/30 shrink-0">
+            <img src="/app-icon.jpg" alt="PledgeBook Logo" className="w-full h-full object-cover" />
           </div>
           <div>
             <div className="font-extrabold text-base sm:text-lg text-slate-900 tracking-tight leading-tight">

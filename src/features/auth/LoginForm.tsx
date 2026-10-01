@@ -7,7 +7,7 @@ import { useI18n } from '../../lib/i18n';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
-import { BookOpen, ShieldCheck, UserCheck, AlertCircle } from 'lucide-react';
+import { ShieldCheck, UserCheck, AlertCircle } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 const loginSchema = z.object({
@@ -64,8 +64,8 @@ export const LoginForm: React.FC = () => {
       <div className="w-full max-w-md">
         {/* App Logo */}
         <div className="text-center mb-6">
-          <div className="inline-flex w-14 h-14 rounded-2xl bg-emerald-600 items-center justify-center text-white shadow-xl shadow-emerald-600/30 mb-3">
-            <BookOpen className="w-8 h-8" />
+          <div className="inline-flex w-16 h-16 rounded-2xl overflow-hidden shadow-xl shadow-emerald-700/25 mb-3 border border-emerald-600/30">
+            <img src="/app-icon.jpg" alt="PledgeBook Logo" className="w-full h-full object-cover" />
           </div>
           <h1 className="text-2xl font-black text-slate-900 tracking-tight">
             {t('app_name')}
