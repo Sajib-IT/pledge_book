@@ -20,11 +20,22 @@ import {
   CheckCircle2,
   XCircle,
   Smartphone,
+  Bell,
+  BellRing,
+  RotateCw,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import type { Profile } from '../../types/database';
+import { useMortgages } from '../mortgages/useMortgages';
+import {
+  checkNotificationPermission,
+  requestNotificationPermissions,
+  sendTestNotification,
+  syncAllMortgageNotifications,
+} from '../../lib/notifications';
+import { Badge } from '../../components/ui/badge';
 
 export const SettingsPage: React.FC = () => {
   const { profile, role, isOwner, logout, switchDemoRole } = useAuth();
@@ -52,6 +63,62 @@ export const SettingsPage: React.FC = () => {
   // PIN lock state
   const [newPin, setNewPin] = useState('');
   const [pinSuccess, setPinSuccess] = useState(false);
+
+  // Mortgages data for notification sync
+  const { data: mortgages = [] } = useMortgages();
+
+  // Notification state
+  const [notificationPermission, setNotificationPermission] = useState<string>('prompt');
+  const [isTestingNotif, setIsTestingNotif] = useState(false);
+  const [testNotifFeedback, setTestNotifFeedback] = useState<string | null>(null);
+  const [isSyncingNotif, setIsSyncingNotif] = useState(false);
+  const [syncNotifFeedback, setSyncNotifFeedback] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    checkNotificationPermission().then((status) => {
+      setNotificationPermission(status);
+    });
+  }, []);
+
+  const handleRequestNotificationPermission = async () => {
+    const granted = await requestNotificationPermissions();
+    setNotificationPermission(granted ? 'granted' : 'denied');
+  };
+
+  const handleSendTestNotification = async () => {
+    setIsTestingNotif(true);
+    setTestNotifFeedback(null);
+    const sent = await sendTestNotification(language);
+    setIsTestingNotif(false);
+    if (sent) {
+      setNotificationPermission('granted');
+      setTestNotifFeedback(
+        language === 'bn'
+          ? 'টেস্ট অ্যালার্ট পাঠানো হয়েছে! ৩ সেকেন্ডের মধ্যে ফোনে নোটিফিকেশন আসবে।'
+          : 'Test alert scheduled! It will ring/vibrate on your phone in 3 seconds.'
+      );
+    } else {
+      setTestNotifFeedback(
+        language === 'bn'
+          ? 'নোটিফিকেশন পাঠানো যায়নি। ফোনের অ্যাপ সেটিংসে নোটিফিকেশন পারমিশন অন করুন।'
+          : 'Could not send alert. Please grant notification permission in system settings.'
+      );
+    }
+    setTimeout(() => setTestNotifFeedback(null), 5000);
+  };
+
+  const handleSyncAllReminders = async () => {
+    setIsSyncingNotif(true);
+    setSyncNotifFeedback(null);
+    const result = await syncAllMortgageNotifications(mortgages, language);
+    setIsSyncingNotif(false);
+    setSyncNotifFeedback(
+      language === 'bn'
+        ? `মোট ${result.activeMortgagesCount}টি সক্রিয় বন্ধকীর জন্য ${result.scheduledRemindersCount}টি রিমাইন্ডার সফলভাবে সিঙ্ক করা হয়েছে।`
+        : `Successfully synced ${result.scheduledRemindersCount} reminders across ${result.activeMortgagesCount} active mortgages.`
+    );
+    setTimeout(() => setSyncNotifFeedback(null), 6000);
+  };
 
   // Fetch Staff profiles (Owner only)
   const { data: staffList = [], isLoading: isLoadingStaff } = useQuery<Profile[]>({
@@ -447,6 +514,101 @@ export const SettingsPage: React.FC = () => {
               <span>অ্যাপ লক পরীক্ষা করুন (Lock Now)</span>
             </Button>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Mobile Notifications & Reminders Card */}
+      <Card className="border-emerald-200/80 bg-white shadow-2xs">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center">
+                <BellRing className="w-4 h-4" />
+              </div>
+              <div>
+                <CardTitle className="text-base font-bold">
+                  {language === 'bn' ? 'মোবাইল নোটিফিকেশন ও অ্যালার্ট' : 'Mobile Notifications & Alerts'}
+                </CardTitle>
+                <p className="text-xs text-slate-500">
+                  {language === 'bn'
+                    ? 'মেয়াদোত্তীর্ণ ও আসন্ন বন্ধকীর স্বয়ংক্রিয় রিমাইন্ডার'
+                    : 'Automated reminders for due and overdue mortgages'}
+                </p>
+              </div>
+            </div>
+
+            <Badge
+              variant={notificationPermission === 'granted' ? 'active' : 'overdue'}
+              className="text-xs"
+            >
+              {notificationPermission === 'granted'
+                ? (language === 'bn' ? 'চালু আছে (Active)' : 'Granted')
+                : (language === 'bn' ? 'অনুমতি প্রয়োজন' : 'Permission Required')}
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 text-xs text-slate-600 space-y-1.5">
+            <div className="font-semibold text-slate-800">
+              {language === 'bn' ? '🔔 রিমাইন্ডার শিডিউল স্তরসমূহ:' : '🔔 Scheduled Reminder Stages:'}
+            </div>
+            <ul className="list-disc pl-4 space-y-0.5 text-slate-600">
+              <li>{language === 'bn' ? 'মেয়াদ শেষ হওয়ার ১৫ দিন পূর্বে প্রাথমিক সতর্কতা' : '15 days before due date (Initial alert)'}</li>
+              <li>{language === 'bn' ? 'মেয়াদ শেষ হওয়ার ৭ দিন পূর্বে তাগাদা অ্যালার্ট' : '7 days before due date (Follow-up alert)'}</li>
+              <li>{language === 'bn' ? 'মেয়াদ শেষ হওয়ার ১ দিন পূর্বে জরুরি নোটিফিকেশন' : '1 day before due date (Urgent alert)'}</li>
+              <li>{language === 'bn' ? 'মেয়াদ পূর্তির দিনে (সকাল ০৯:০০ টায়) চূড়ান্ত রিমাইন্ডার' : 'On due date at 09:00 AM (Final reminder)'}</li>
+            </ul>
+          </div>
+
+          {testNotifFeedback && (
+            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-semibold text-emerald-800 flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>{testNotifFeedback}</span>
+            </div>
+          )}
+
+          {syncNotifFeedback && (
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs font-semibold text-blue-800 flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />
+              <span>{syncNotifFeedback}</span>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+            {notificationPermission !== 'granted' ? (
+              <Button
+                type="button"
+                variant="primary"
+                onClick={handleRequestNotificationPermission}
+                className="gap-2 text-xs h-10 w-full"
+              >
+                <Bell className="w-4 h-4" />
+                <span>{language === 'bn' ? 'নোটিফিকেশন অনুমতি দিন' : 'Grant Permission'}</span>
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleSendTestNotification}
+                isLoading={isTestingNotif}
+                className="gap-2 text-xs h-10 w-full border-emerald-300 text-emerald-800 hover:bg-emerald-50"
+              >
+                <Bell className="w-4 h-4 text-emerald-600" />
+                <span>{language === 'bn' ? 'টেস্ট নোটিফিকেশন পাঠান' : 'Send Test Notification'}</span>
+              </Button>
+            )}
+
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleSyncAllReminders}
+              isLoading={isSyncingNotif}
+              className="gap-2 text-xs h-10 w-full border-slate-300 text-slate-700 hover:bg-slate-50"
+            >
+              <RotateCw className="w-4 h-4 text-slate-500" />
+              <span>{language === 'bn' ? 'সকল বন্ধকী রিমাইন্ডার সিঙ্ক' : 'Sync All Reminders'}</span>
+            </Button>
+          </div>
         </CardContent>
       </Card>
 

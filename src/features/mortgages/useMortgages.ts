@@ -400,10 +400,23 @@ export const useRenewMortgage = () => {
       if (error) throw error;
       return data;
     },
-    onSuccess: (_, variables) => {
+    onSuccess: (data: any, variables) => {
       queryClient.invalidateQueries({ queryKey: ['mortgage', variables.mortgageId] });
       queryClient.invalidateQueries({ queryKey: ['mortgages'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard_stats'] });
+
+      // Reschedule notifications for the new +1 year term
+      const cached = queryClient.getQueryData<{ mortgage: Mortgage; payments: any[] }>([
+        'mortgage',
+        variables.mortgageId,
+        isMockMode,
+      ]);
+      if (cached?.mortgage && data?.new_due_date) {
+        scheduleMortgageNotifications({
+          ...cached.mortgage,
+          due_date: data.new_due_date,
+        });
+      }
     },
   });
 };
