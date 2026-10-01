@@ -123,6 +123,19 @@ export const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
               </div>
             </div>
           )}
+
+          {customer.nid_photo_path && (
+            <div className="pt-2 border-t border-slate-200">
+              <span className="text-xs text-slate-500 block mb-1.5 font-medium">{t('customers.nid_photo')}</span>
+              <div className="rounded-xl overflow-hidden border border-slate-200 max-h-48 bg-slate-100 flex items-center justify-center">
+                <img
+                  src={customer.nid_photo_path}
+                  alt="NID Document"
+                  className="w-full h-auto max-h-48 object-contain"
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Issue Mortgage Button */}

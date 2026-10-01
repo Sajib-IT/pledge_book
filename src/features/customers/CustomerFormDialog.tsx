@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -8,8 +8,8 @@ import { Button } from '../../components/ui/button';
 import { useI18n } from '../../lib/i18n';
 import type { Customer } from '../../types/database';
 import { useCreateCustomer, useUpdateCustomer } from './useCustomers';
-import { Camera, User } from 'lucide-react';
-import { Camera as CapCamera, CameraResultType, CameraSource } from '@capacitor/camera';
+import { Camera, Image as ImageIcon, User, Trash2, CreditCard } from 'lucide-react';
+import { captureFromCamera, pickFromGallery, readFileAsDataUrl } from '../../lib/media';
 
 const customerSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -40,6 +40,12 @@ export const CustomerFormDialog: React.FC<CustomerFormDialogProps> = ({
   const createMutation = useCreateCustomer();
   const updateMutation = useUpdateCustomer();
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [nidPhotoPreview, setNidPhotoPreview] = useState<string | null>(null);
+
+  const photoCameraInputRef = useRef<HTMLInputElement>(null);
+  const photoGalleryInputRef = useRef<HTMLInputElement>(null);
+  const nidCameraInputRef = useRef<HTMLInputElement>(null);
+  const nidGalleryInputRef = useRef<HTMLInputElement>(null);
 
   const {
     register,
@@ -72,6 +78,7 @@ export const CustomerFormDialog: React.FC<CustomerFormDialogProps> = ({
         nid_photo_path: customerToEdit.nid_photo_path,
       });
       setPhotoPreview(customerToEdit.photo_path || null);
+      setNidPhotoPreview(customerToEdit.nid_photo_path || null);
     } else {
       reset({
         name: '',
@@ -83,40 +90,80 @@ export const CustomerFormDialog: React.FC<CustomerFormDialogProps> = ({
         nid_photo_path: null,
       });
       setPhotoPreview(null);
+      setNidPhotoPreview(null);
     }
   }, [customerToEdit, reset, isOpen]);
 
-  const handleTakePhoto = async () => {
-    try {
-      const image = await CapCamera.getPhoto({
-        quality: 85,
-        allowEditing: true,
-        resultType: CameraResultType.DataUrl,
-        source: CameraSource.Prompt, // Prompts camera or photos
-      });
-
-      if (image?.dataUrl) {
-        setPhotoPreview(image.dataUrl);
-        setValue('photo_path', image.dataUrl);
-      }
-    } catch {
-      // Fallback for desktop browser: triggers standard file input
-      const fileInput = document.getElementById('customer-photo-file') as HTMLInputElement;
-      if (fileInput) fileInput.click();
+  // Handlers for Customer Photo
+  const handlePhotoFromCamera = async () => {
+    const dataUrl = await captureFromCamera(85);
+    if (dataUrl) {
+      setPhotoPreview(dataUrl);
+      setValue('photo_path', dataUrl);
+    } else {
+      photoCameraInputRef.current?.click();
     }
   };
 
-  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoFromGallery = async () => {
+    const dataUrl = await pickFromGallery(85);
+    if (dataUrl) {
+      setPhotoPreview(dataUrl);
+      setValue('photo_path', dataUrl);
+    } else {
+      photoGalleryInputRef.current?.click();
+    }
+  };
+
+  const handlePhotoFileInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64 = reader.result as string;
-        setPhotoPreview(base64);
-        setValue('photo_path', base64);
-      };
-      reader.readAsDataURL(file);
+      const dataUrl = await readFileAsDataUrl(file);
+      setPhotoPreview(dataUrl);
+      setValue('photo_path', dataUrl);
+      e.target.value = '';
     }
+  };
+
+  const handleRemovePhoto = () => {
+    setPhotoPreview(null);
+    setValue('photo_path', null);
+  };
+
+  // Handlers for NID Photo
+  const handleNidFromCamera = async () => {
+    const dataUrl = await captureFromCamera(85);
+    if (dataUrl) {
+      setNidPhotoPreview(dataUrl);
+      setValue('nid_photo_path', dataUrl);
+    } else {
+      nidCameraInputRef.current?.click();
+    }
+  };
+
+  const handleNidFromGallery = async () => {
+    const dataUrl = await pickFromGallery(85);
+    if (dataUrl) {
+      setNidPhotoPreview(dataUrl);
+      setValue('nid_photo_path', dataUrl);
+    } else {
+      nidGalleryInputRef.current?.click();
+    }
+  };
+
+  const handleNidFileInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const dataUrl = await readFileAsDataUrl(file);
+      setNidPhotoPreview(dataUrl);
+      setValue('nid_photo_path', dataUrl);
+      e.target.value = '';
+    }
+  };
+
+  const handleRemoveNidPhoto = () => {
+    setNidPhotoPreview(null);
+    setValue('nid_photo_path', null);
   };
 
   const onSubmit = async (data: CustomerFormData) => {
@@ -156,36 +203,129 @@ export const CustomerFormDialog: React.FC<CustomerFormDialogProps> = ({
       title={customerToEdit ? t('customers.edit_customer') : t('customers.add_customer')}
     >
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        {/* Customer Photo Upload / Camera Preview */}
-        <div className="flex items-center gap-4 p-3 rounded-2xl bg-slate-50 border border-slate-200">
+        {/* Customer Photo Upload (Camera + Gallery) */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-2xl bg-slate-50 border border-slate-200">
           <div className="relative w-16 h-16 rounded-xl bg-slate-200 overflow-hidden flex items-center justify-center shrink-0 border border-slate-300">
             {photoPreview ? (
-              <img src={photoPreview} alt="Customer" className="w-full h-full object-cover" />
+              <>
+                <img src={photoPreview} alt="Customer" className="w-full h-full object-cover" />
+                <button
+                  type="button"
+                  onClick={handleRemovePhoto}
+                  className="absolute top-1 right-1 p-1 bg-rose-600 text-white rounded-md shadow-xs hover:bg-rose-700 transition-colors"
+                  title="Remove"
+                >
+                  <Trash2 className="w-3 h-3" />
+                </button>
+              </>
             ) : (
               <User className="w-8 h-8 text-slate-400" />
             )}
           </div>
-          <div className="space-y-1">
+          <div className="space-y-1.5 flex-1">
             <span className="text-xs font-bold text-slate-800 block">
               {t('customers.customer_photo')}
             </span>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={handleTakePhoto}
-                className="gap-1.5 text-xs h-8"
+                onClick={handlePhotoFromCamera}
+                className="gap-1.5 text-xs h-8 text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300"
               >
                 <Camera className="w-3.5 h-3.5 text-emerald-600" />
-                <span>{t('customers.take_photo')}</span>
+                <span>{language === 'bn' ? 'ক্যামেরা' : 'Camera'}</span>
               </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handlePhotoFromGallery}
+                className="gap-1.5 text-xs h-8 text-slate-700 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300"
+              >
+                <ImageIcon className="w-3.5 h-3.5 text-blue-600" />
+                <span>{language === 'bn' ? 'গ্যালারি / ফাইল' : 'Gallery / Files'}</span>
+              </Button>
+
               <input
-                id="customer-photo-file"
+                ref={photoCameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={handlePhotoFileInput}
+              />
+              <input
+                ref={photoGalleryInputRef}
                 type="file"
                 accept="image/*"
                 className="hidden"
-                onChange={handleFileInput}
+                onChange={handlePhotoFileInput}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* NID Document Photo Upload (Camera + Gallery) */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-2xl bg-slate-50 border border-slate-200">
+          <div className="relative w-16 h-16 rounded-xl bg-slate-200 overflow-hidden flex items-center justify-center shrink-0 border border-slate-300">
+            {nidPhotoPreview ? (
+              <>
+                <img src={nidPhotoPreview} alt="NID Document" className="w-full h-full object-cover" />
+                <button
+                  type="button"
+                  onClick={handleRemoveNidPhoto}
+                  className="absolute top-1 right-1 p-1 bg-rose-600 text-white rounded-md shadow-xs hover:bg-rose-700 transition-colors"
+                  title="Remove"
+                >
+                  <Trash2 className="w-3 h-3" />
+                </button>
+              </>
+            ) : (
+              <CreditCard className="w-8 h-8 text-slate-400" />
+            )}
+          </div>
+          <div className="space-y-1.5 flex-1">
+            <span className="text-xs font-bold text-slate-800 block">
+              {t('customers.nid_photo')}
+            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleNidFromCamera}
+                className="gap-1.5 text-xs h-8 text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300"
+              >
+                <Camera className="w-3.5 h-3.5 text-emerald-600" />
+                <span>{language === 'bn' ? 'ক্যামেরা' : 'Camera'}</span>
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleNidFromGallery}
+                className="gap-1.5 text-xs h-8 text-slate-700 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300"
+              >
+                <ImageIcon className="w-3.5 h-3.5 text-blue-600" />
+                <span>{language === 'bn' ? 'গ্যালারি / ফাইল' : 'Gallery / Files'}</span>
+              </Button>
+
+              <input
+                ref={nidCameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={handleNidFileInput}
+              />
+              <input
+                ref={nidGalleryInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleNidFileInput}
               />
             </div>
           </div>

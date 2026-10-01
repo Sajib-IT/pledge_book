@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -20,12 +20,13 @@ import {
   UserPlus,
   Coins,
   Camera,
+  Image as ImageIcon,
   Gem,
   Plus,
   Trash2,
 } from 'lucide-react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Camera as CapCamera, CameraResultType, CameraSource } from '@capacitor/camera';
+import { captureFromCamera, pickFromGallery, readFileAsDataUrl } from '../../lib/media';
 import type { CollateralType } from '../../types/database';
 
 const mortgageSchema = z.object({
@@ -101,32 +102,46 @@ export const NewMortgagePage: React.FC = () => {
   const yearlyInterest = calculateYearlyInterest(watchedPrincipal, watchedRate);
   const settlement = calculateCloseAmount(watchedPrincipal, watchedRate);
 
-  const handleCapturePhoto = async () => {
-    try {
-      const image = await CapCamera.getPhoto({
-        quality: 80,
-        resultType: CameraResultType.DataUrl,
-        source: CameraSource.Prompt,
-      });
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
 
-      if (image?.dataUrl) {
-        setCollateralPhotos((prev) => [...prev, image.dataUrl!]);
-      }
-    } catch {
-      const fileInput = document.getElementById('collateral-file-input') as HTMLInputElement;
-      if (fileInput) fileInput.click();
+  const handleCapturePhoto = async () => {
+    const dataUrl = await captureFromCamera(80);
+    if (dataUrl) {
+      setCollateralPhotos((prev) => [...prev, dataUrl]);
+    } else {
+      cameraInputRef.current?.click();
     }
   };
 
-  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePickFromGallery = async () => {
+    const dataUrl = await pickFromGallery(80);
+    if (dataUrl) {
+      setCollateralPhotos((prev) => [...prev, dataUrl]);
+    } else {
+      galleryInputRef.current?.click();
+    }
+  };
+
+  const handleCameraFileInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64 = reader.result as string;
-        setCollateralPhotos((prev) => [...prev, base64]);
-      };
-      reader.readAsDataURL(file);
+      const dataUrl = await readFileAsDataUrl(file);
+      setCollateralPhotos((prev) => [...prev, dataUrl]);
+      e.target.value = '';
+    }
+  };
+
+  const handleGalleryFileInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      const newPhotos: string[] = [];
+      for (let i = 0; i < files.length; i++) {
+        const dataUrl = await readFileAsDataUrl(files[i]);
+        newPhotos.push(dataUrl);
+      }
+      setCollateralPhotos((prev) => [...prev, ...newPhotos]);
+      e.target.value = '';
     }
   };
 
@@ -344,27 +359,49 @@ export const NewMortgagePage: React.FC = () => {
 
             {/* Photos from Camera / Gallery */}
             <div className="space-y-2 pt-2">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <label className="text-xs font-semibold uppercase tracking-wider text-slate-700">
                   {t('mortgages.collateral_photos')} ({collateralPhotos.length})
                 </label>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleCapturePhoto}
-                  className="gap-1.5 text-xs text-emerald-700 border-emerald-300 hover:bg-emerald-50 h-8"
-                >
-                  <Camera className="w-3.5 h-3.5" />
-                  <span>{language === 'bn' ? 'ক্যামেরায় ছবি তুলুন' : 'Take Photo'}</span>
-                </Button>
-                <input
-                  id="collateral-file-input"
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleFileInput}
-                />
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleCapturePhoto}
+                    className="gap-1.5 text-xs text-emerald-700 border-emerald-300 hover:bg-emerald-50 h-8"
+                  >
+                    <Camera className="w-3.5 h-3.5" />
+                    <span>{language === 'bn' ? 'ক্যামেরা' : 'Camera'}</span>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handlePickFromGallery}
+                    className="gap-1.5 text-xs text-blue-700 border-blue-300 hover:bg-blue-50 h-8"
+                  >
+                    <ImageIcon className="w-3.5 h-3.5" />
+                    <span>{language === 'bn' ? 'গ্যালারি / ফাইল' : 'Gallery / Files'}</span>
+                  </Button>
+
+                  <input
+                    ref={cameraInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    className="hidden"
+                    onChange={handleCameraFileInput}
+                  />
+                  <input
+                    ref={galleryInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={handleGalleryFileInput}
+                  />
+                </div>
               </div>
 
               {collateralPhotos.length > 0 ? (
