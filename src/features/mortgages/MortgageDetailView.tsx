@@ -130,7 +130,9 @@ export const MortgageDetailView: React.FC = () => {
   const handleCall = () => window.open(`tel:${phone}`);
   const handleWhatsApp = () => {
     const text = encodeURIComponent(
-      `আসসালামু আলাইকুম ${mortgage.customer?.name || ''} ভাই/আপা, আপনার বন্ধকী (${mortgage.mortgage_no}) সংক্রান্ত যোগাযোগ।`
+      language === 'bn'
+        ? `আসসালামু আলাইকুম ${mortgage.customer?.name || ''} ভাই/আপা, আপনার বন্ধকী (${mortgage.mortgage_no}) সংক্রান্ত যোগাযোগ।`
+        : `Hello ${mortgage.customer?.name || ''}, contacting you regarding your mortgage ${mortgage.mortgage_no}.`
     );
     window.open(`https://wa.me/${internationalPhone}?text=${text}`);
   };
@@ -141,9 +143,11 @@ export const MortgageDetailView: React.FC = () => {
       const netAmount = renewCalculation.netInterest;
       const discountText =
         renewCalculation.discount > 0
-          ? ` [ছাড়: ${formatBDT(renewCalculation.discount, language)}]`
+          ? ` [${language === 'bn' ? 'ছাড়' : 'Discount'}: ${formatBDT(renewCalculation.discount, language)}]`
           : '';
-      const detailedNote = (paymentNote ? paymentNote + ' ' : '') + `(বার্ষিক সুদ: ${formatBDT(renewCalculation.yearlyInterest, language)}${discountText})`;
+      const detailedNote =
+        (paymentNote ? paymentNote + ' ' : '') +
+        `(${language === 'bn' ? 'বার্ষিক সুদ' : 'Yearly Interest'}: ${formatBDT(renewCalculation.yearlyInterest, language)}${discountText})`;
 
       const res = await renewMutation.mutateAsync({
         mortgageId: mortgage.id,
@@ -162,7 +166,7 @@ export const MortgageDetailView: React.FC = () => {
       setRenewDiscount(0);
       setCustomRenewInterest('');
     } catch (err) {
-      alert('রিনিউ সম্পন্ন করতে সমস্যা হয়েছে: ' + (err as Error).message);
+      alert((language === 'bn' ? 'রিনিউ সম্পন্ন করতে সমস্যা হয়েছে: ' : 'Failed to renew mortgage: ') + (err as Error).message);
     }
   };
 
@@ -172,15 +176,15 @@ export const MortgageDetailView: React.FC = () => {
       const totalAmount = earlySettlement.total;
       const discountText =
         earlySettlement.discount > 0
-          ? ` [ছাড়: ${formatBDT(earlySettlement.discount, language)}]`
+          ? ` [${language === 'bn' ? 'ছাড়' : 'Discount'}: ${formatBDT(earlySettlement.discount, language)}]`
           : '';
       const modeText =
         earlySettlement.mode !== 'full_year'
-          ? ` [পদ্ধতি: ${earlySettlement.mode}, অতিবাহিত: ${earlySettlement.daysElapsed} দিন]`
+          ? ` [${language === 'bn' ? 'পদ্ধতি' : 'Mode'}: ${earlySettlement.mode}, ${language === 'bn' ? 'অতিবাহিত' : 'Elapsed'}: ${earlySettlement.daysElapsed} ${language === 'bn' ? 'দিন' : 'days'}]`
           : '';
       const detailedNote =
         (paymentNote ? paymentNote + ' ' : '') +
-        `(আসল: ${formatBDT(earlySettlement.principal, language)}, নিট সুদ: ${formatBDT(earlySettlement.netInterest, language)}${discountText}${modeText})`;
+        `(${language === 'bn' ? 'আসল' : 'Principal'}: ${formatBDT(earlySettlement.principal, language)}, ${language === 'bn' ? 'নিট সুদ' : 'Net Interest'}: ${formatBDT(earlySettlement.netInterest, language)}${discountText}${modeText})`;
 
       const res = await closeMutation.mutateAsync({
         mortgageId: mortgage.id,
@@ -199,14 +203,14 @@ export const MortgageDetailView: React.FC = () => {
       setCloseDiscount(0);
       setCustomCloseInterest('');
     } catch (err) {
-      alert('বন্ধক পরিশোধ ও সমাপ্তি সম্পন্ন করতে সমস্যা হয়েছে: ' + (err as Error).message);
+      alert((language === 'bn' ? 'বন্ধক পরিশোধ ও সমাপ্তি সম্পন্ন করতে সমস্যা হয়েছে: ' : 'Failed to close mortgage: ') + (err as Error).message);
     }
   };
 
   // Submit Correction RPC
   const handleConfirmCorrection = async () => {
     if (!correctionTargetPayment || !correctionReason.trim()) {
-      alert('সংশোধনের কারণ উল্লেখ করা আবশ্যক');
+      alert(language === 'bn' ? 'সংশোধনের কারণ উল্লেখ করা আবশ্যক' : 'Reason for correction is required');
       return;
     }
 
@@ -225,7 +229,7 @@ export const MortgageDetailView: React.FC = () => {
         amount: (res as any).reversal_amount,
       });
     } catch (err) {
-      alert('সংশোধন ব্যর্থ হয়েছে: ' + (err as Error).message);
+      alert((language === 'bn' ? 'সংশোধন ব্যর্থ হয়েছে: ' : 'Correction failed: ') + (err as Error).message);
     }
   };
 
@@ -310,10 +314,10 @@ export const MortgageDetailView: React.FC = () => {
             </div>
             <div>
               <p className="text-sm font-bold text-emerald-950">
-                লেনদেন সফলভাবে সম্পন্ন ও সংরক্ষিত হয়েছে
+                {language === 'bn' ? 'লেনদেন সফলভাবে সম্পন্ন ও সংরক্ষিত হয়েছে' : 'Transaction successfully processed and recorded'}
               </p>
               <p className="text-xs text-emerald-700 mt-0.5">
-                রসিদ নম্বর: <strong className="font-mono">{successReceipt.receipt_no}</strong> • পরিমাণ:{' '}
+                {t('payments.receipt_no')}: <strong className="font-mono">{successReceipt.receipt_no}</strong> • {language === 'bn' ? 'পরিমাণ:' : 'Amount:'}{' '}
                 <strong>{formatBDT(successReceipt.amount, language)}</strong>
               </p>
             </div>
@@ -340,7 +344,7 @@ export const MortgageDetailView: React.FC = () => {
             className="gap-1.5 border-emerald-300 text-emerald-800 hover:bg-emerald-100/60 font-bold shrink-0"
           >
             <Printer className="w-4 h-4 text-emerald-700" />
-            <span>রসিদ প্রিন্ট / শেয়ার (Receipt)</span>
+            <span>{language === 'bn' ? 'রসিদ প্রিন্ট / শেয়ার' : 'Print / Share Receipt'}</span>
           </Button>
         </div>
       )}
@@ -351,10 +355,14 @@ export const MortgageDetailView: React.FC = () => {
           <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
           <div className="flex-1 text-xs sm:text-sm">
             <p className="font-bold">
-              সতর্কতা: এই বন্ধকটির মেয়াদ {Math.abs(daysUntilDue)} দিন আগে উত্তীর্ণ হয়েছে!
+              {language === 'bn'
+                ? `সতর্কতা: এই বন্ধকটির মেয়াদ ${Math.abs(daysUntilDue)} দিন আগে উত্তীর্ণ হয়েছে!`
+                : `Warning: This mortgage expired ${Math.abs(daysUntilDue)} days ago!`}
             </p>
             <p className="text-rose-700 text-xs mt-0.5">
-              অনতিবিলম্বে গ্রাহকের সাথে যোগাযোগ করে বার্ষিক সুদ আদায়পূর্বক নবায়ন অথবা আসল+সুদ সম্পূর্ণ আদায় করুন।
+              {language === 'bn'
+                ? 'অনতিবিলম্বে গ্রাহকের সাথে যোগাযোগ করে বার্ষিক সুদ আদায়পূর্বক নবায়ন অথবা আসল+সুদ সম্পূর্ণ আদায় করুন।'
+                : 'Contact customer immediately to collect annual interest renewal or full settlement.'}
             </p>
           </div>
         </div>
@@ -374,7 +382,9 @@ export const MortgageDetailView: React.FC = () => {
                 <div className="text-xl sm:text-2xl font-black text-slate-900 font-mono mt-1">
                   {formatBDT(mortgage.principal, language)}
                 </div>
-                <span className="text-[11px] text-slate-400 mt-1 block">মূল ঋণ হিসাব</span>
+                <span className="text-[11px] text-slate-400 mt-1 block">
+                  {language === 'bn' ? 'মূল ঋণ হিসাব' : 'Base loan balance'}
+                </span>
               </CardContent>
             </Card>
 
@@ -387,7 +397,9 @@ export const MortgageDetailView: React.FC = () => {
                   {formatBDT(yearlyInterest, language)}
                 </div>
                 <span className="text-[11px] text-slate-400 mt-1 block">
-                  হার: {mortgage.interest_rate}% বার্ষিক ফ্ল্যাট
+                  {language === 'bn'
+                    ? `হার: ${mortgage.interest_rate}% বার্ষিক ফ্ল্যাট`
+                    : `Rate: ${mortgage.interest_rate}% yearly flat`}
                 </span>
               </CardContent>
             </Card>
@@ -395,12 +407,14 @@ export const MortgageDetailView: React.FC = () => {
             <Card className="border-slate-200">
               <CardContent className="p-4">
                 <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">
-                  ১ বছরে মোট নিষ্পত্তি
+                  {language === 'bn' ? '১ বছরে মোট নিষ্পত্তি' : '1-Year Total Settlement'}
                 </span>
                 <div className="text-xl sm:text-2xl font-black text-blue-900 font-mono mt-1">
                   {formatBDT(mortgage.principal + yearlyInterest, language)}
                 </div>
-                <span className="text-[11px] text-slate-400 mt-1 block">আসল + ১ বছরের সুদ</span>
+                <span className="text-[11px] text-slate-400 mt-1 block">
+                  {language === 'bn' ? 'আসল + ১ বছরের সুদ' : 'Principal + 1 year interest'}
+                </span>
               </CardContent>
             </Card>
           </div>
@@ -424,7 +438,7 @@ export const MortgageDetailView: React.FC = () => {
               {mortgage.collateral_photo_paths && mortgage.collateral_photo_paths.length > 0 && (
                 <div className="space-y-2">
                   <span className="text-xs font-bold text-slate-600 block">
-                    সংযুক্ত জামানতের ছবিসমূহ:
+                    {language === 'bn' ? 'সংযুক্ত জামানতের ছবিসমূহ:' : 'Attached Collateral Photos:'}
                   </span>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     {mortgage.collateral_photo_paths.map((p, idx) => (
@@ -456,14 +470,16 @@ export const MortgageDetailView: React.FC = () => {
                   </CardTitle>
                 </div>
                 <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
-                  মোট {payments.length} টি লেনদেন
+                  {language === 'bn' ? `মোট ${payments.length}টি লেনদেন` : `${payments.length} transactions`}
                 </span>
               </div>
             </CardHeader>
             <CardContent>
               {payments.length === 0 ? (
                 <div className="p-6 text-center text-xs text-slate-400 border border-dashed border-slate-200 rounded-xl">
-                  এখনো কোনো কিস্তি বা সুদ পরিশোধের রেকর্ড নেই।
+                  {language === 'bn'
+                    ? 'এখনো কোনো কিস্তি বা সুদ পরিশোধের রেকর্ড নেই।'
+                    : 'No payment or renewal records yet.'}
                 </div>
               ) : (
                 <div className="divide-y divide-slate-100">
@@ -527,7 +543,7 @@ export const MortgageDetailView: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => setSelectedReceiptPayment(p)}
-                              title="রসিদ দেখুন ও প্রিন্ট করুন"
+                              title={language === 'bn' ? 'রসিদ দেখুন ও প্রিন্ট করুন' : 'View & Print Receipt'}
                               className="p-1.5 rounded-lg text-emerald-700 hover:bg-emerald-50 transition-colors"
                             >
                               <Printer className="w-4 h-4" />
@@ -626,21 +642,23 @@ export const MortgageDetailView: React.FC = () => {
           {/* Financial Breakdown */}
           <div className="p-4 rounded-2xl bg-blue-50/70 border border-blue-200 text-center space-y-2">
             <span className="text-xs font-semibold text-blue-700 uppercase tracking-wider block">
-              প্রদেয় নিট সুদের পরিমাণ
+              {language === 'bn' ? 'প্রদেয় নিট সুদের পরিমাণ' : 'Net Interest Payable'}
             </span>
             <div className="text-2xl sm:text-3xl font-black text-blue-900 font-mono">
               {formatBDT(renewCalculation.netInterest, language)}
             </div>
             <div className="flex items-center justify-center gap-3 text-xs text-blue-700 pt-1">
-              <span>নির্ধারিত সুদ: {formatBDT(renewCalculation.yearlyInterest, language)}</span>
+              <span>{language === 'bn' ? 'নির্ধারিত সুদ:' : 'Yearly Interest:'} {formatBDT(renewCalculation.yearlyInterest, language)}</span>
               {renewCalculation.discount > 0 && (
                 <span className="font-bold text-rose-600">
-                  ছাড়: -{formatBDT(renewCalculation.discount, language)}
+                  {language === 'bn' ? 'ছাড়:' : 'Discount:'} -{formatBDT(renewCalculation.discount, language)}
                 </span>
               )}
             </div>
             <p className="text-[11px] text-blue-600 border-t border-blue-200/60 pt-1.5">
-              মূল আসল {formatBDT(mortgage.principal, language)} অপরিবর্তিত থাকবে ও মেয়াদ +১ বছর বৃদ্ধি পাবে।
+              {language === 'bn'
+                ? `মূল আসল ${formatBDT(mortgage.principal, 'bn')} অপরিবর্তিত থাকবে ও মেয়াদ +১ বছর বৃদ্ধি পাবে।`
+                : `Principal ${formatBDT(mortgage.principal, 'en')} remains unchanged and due date extends +1 year.`}
             </p>
           </div>
 
@@ -674,7 +692,7 @@ export const MortgageDetailView: React.FC = () => {
             <Input
               type="number"
               step="100"
-              placeholder="যেমন: ৫০০ বা ১,০০০ টাকা ছাড়"
+              placeholder={language === 'bn' ? 'যেমন: ৫০০ বা ১,০০০ টাকা ছাড়' : 'e.g. 500 or 1,000 taka discount'}
               value={renewDiscount || ''}
               onChange={(e) => {
                 setRenewDiscount(Number(e.target.value) || 0);
@@ -692,7 +710,7 @@ export const MortgageDetailView: React.FC = () => {
 
           <Input
             label={t('payments.note')}
-            placeholder="নবায়ন ও ছাড় সংক্রান্ত মন্তব্য (ঐচ্ছিক)"
+            placeholder={language === 'bn' ? 'নবায়ন ও ছাড় সংক্রান্ত মন্তব্য (ঐচ্ছিক)' : 'Renewal and discount notes (optional)'}
             value={paymentNote}
             onChange={(e) => setPaymentNote(e.target.value)}
           />
@@ -712,7 +730,7 @@ export const MortgageDetailView: React.FC = () => {
               isLoading={renewMutation.isPending}
             >
               <RotateCw className="w-4 h-4 mr-1.5" />
-              <span>সুদ গ্রহণ ও মেয়াদ বৃদ্ধি নিশ্চিত করুন</span>
+              <span>{language === 'bn' ? 'সুদ গ্রহণ ও মেয়াদ বৃদ্ধি নিশ্চিত করুন' : 'Confirm Renewal & Receive Interest'}</span>
             </Button>
           </div>
         </div>
@@ -732,7 +750,9 @@ export const MortgageDetailView: React.FC = () => {
               <Clock className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
               <div>
                 <strong className="block font-bold">
-                  {t('mortgages.early_settlement')} ({earlySettlement.daysElapsed} দিন / {earlySettlement.monthsElapsed} মাস অতিবাহিত)
+                  {t('mortgages.early_settlement')} (
+                  {earlySettlement.daysElapsed} {language === 'bn' ? 'দিন' : 'days'} /{' '}
+                  {earlySettlement.monthsElapsed} {language === 'bn' ? 'মাস অতিবাহিত' : 'months elapsed'})
                 </strong>
                 <p className="text-amber-700 text-[11px] mt-0.5">
                   {t('mortgages.early_notice')}
@@ -759,7 +779,9 @@ export const MortgageDetailView: React.FC = () => {
                     : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
                 }`}
               >
-                <span className="block text-[10px] text-slate-500 font-normal">১ বছর চুক্তি</span>
+                <span className="block text-[10px] text-slate-500 font-normal">
+                  {language === 'bn' ? '১ বছর চুক্তি' : '1-Year Term'}
+                </span>
                 <span>{t('mortgages.mode_full_year')}</span>
               </button>
 
@@ -775,7 +797,9 @@ export const MortgageDetailView: React.FC = () => {
                     : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
                 }`}
               >
-                <span className="block text-[10px] text-slate-500 font-normal">{earlySettlement.monthsElapsed} মাস</span>
+                <span className="block text-[10px] text-slate-500 font-normal">
+                  {earlySettlement.monthsElapsed} {language === 'bn' ? 'মাস' : 'mos'}
+                </span>
                 <span>{t('mortgages.mode_monthly')}</span>
               </button>
 
@@ -791,7 +815,9 @@ export const MortgageDetailView: React.FC = () => {
                     : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
                 }`}
               >
-                <span className="block text-[10px] text-slate-500 font-normal">{earlySettlement.daysElapsed} দিন</span>
+                <span className="block text-[10px] text-slate-500 font-normal">
+                  {earlySettlement.daysElapsed} {language === 'bn' ? 'দিন' : 'days'}
+                </span>
                 <span>{t('mortgages.mode_daily')}</span>
               </button>
 
@@ -804,7 +830,9 @@ export const MortgageDetailView: React.FC = () => {
                     : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
                 }`}
               >
-                <span className="block text-[10px] text-slate-500 font-normal">সমঝোতা</span>
+                <span className="block text-[10px] text-slate-500 font-normal">
+                  {language === 'bn' ? 'সমঝোতা' : 'Agreed'}
+                </span>
                 <span>{t('mortgages.mode_custom')}</span>
               </button>
             </div>
@@ -815,7 +843,7 @@ export const MortgageDetailView: React.FC = () => {
             <Input
               label={t('mortgages.custom_interest')}
               type="number"
-              placeholder="আদায়কৃত সুদের পরিমাণ লিখুন"
+              placeholder={language === 'bn' ? 'আদায়কৃত সুদের পরিমাণ লিখুন' : 'Enter agreed interest amount'}
               value={customCloseInterest}
               onChange={(e) => setCustomCloseInterest(e.target.value)}
             />
@@ -848,7 +876,7 @@ export const MortgageDetailView: React.FC = () => {
             <Input
               type="number"
               step="100"
-              placeholder={t('mortgages.discount_placeholder')}
+              placeholder={language === 'bn' ? 'যেমন: ৫০০ বা ১,০০০ টাকা ছাড়' : 'e.g. 500 or 1,000 taka discount'}
               value={closeDiscount || ''}
               onChange={(e) => setCloseDiscount(Number(e.target.value) || 0)}
             />
@@ -858,18 +886,18 @@ export const MortgageDetailView: React.FC = () => {
           <div className="p-4 rounded-2xl bg-gradient-to-tr from-emerald-50 to-teal-50/50 border border-emerald-200">
             <div className="space-y-1.5 text-xs text-slate-700 pb-2 border-b border-emerald-200/60">
               <div className="flex justify-between">
-                <span>মূল আসল (Principal):</span>
+                <span>{language === 'bn' ? 'মূল আসল (Principal):' : 'Principal Amount:'}</span>
                 <span className="font-mono font-bold">{formatBDT(earlySettlement.principal, language)}</span>
               </div>
               <div className="flex justify-between">
-                <span>ধার্যকৃত সুদ ({earlySettlement.mode}):</span>
+                <span>{language === 'bn' ? `ধার্যকৃত সুদ (${earlySettlement.mode}):` : `Calculated Interest (${earlySettlement.mode}):`}</span>
                 <span className="font-mono font-bold text-emerald-700">
                   +{formatBDT(earlySettlement.calculatedInterest, language)}
                 </span>
               </div>
               {earlySettlement.discount > 0 && (
                 <div className="flex justify-between text-rose-600 font-bold">
-                  <span>ছাড় / ডিসকাউন্ট (Discount):</span>
+                  <span>{language === 'bn' ? 'ছাড় / ডিসকাউন্ট (Discount):' : 'Discount / Waiver:'}</span>
                   <span className="font-mono">-{formatBDT(earlySettlement.discount, language)}</span>
                 </div>
               )}
@@ -894,7 +922,7 @@ export const MortgageDetailView: React.FC = () => {
 
           <Input
             label={t('payments.note')}
-            placeholder="পরিশোধ ও জামানত ফেরত সংক্রান্ত মন্তব্য..."
+            placeholder={language === 'bn' ? 'পরিশোধ ও জামানত ফেরত সংক্রান্ত মন্তব্য...' : 'Settlement and collateral return notes...'}
             value={paymentNote}
             onChange={(e) => setPaymentNote(e.target.value)}
           />
@@ -914,7 +942,7 @@ export const MortgageDetailView: React.FC = () => {
               isLoading={closeMutation.isPending}
             >
               <CheckCircle2 className="w-4 h-4 mr-1.5" />
-              <span>সম্পূর্ণ পরিশোধ ও সমাপ্ত করুন</span>
+              <span>{language === 'bn' ? 'সম্পূর্ণ পরিশোধ ও সমাপ্ত করুন' : 'Confirm Full Settlement & Close'}</span>
             </Button>
           </div>
         </div>
@@ -931,10 +959,11 @@ export const MortgageDetailView: React.FC = () => {
           <div className="space-y-4">
             <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-800 space-y-1">
               <div>
-                রসিদ নং: <strong className="font-mono">{correctionTargetPayment.receipt_no}</strong>
+                {language === 'bn' ? 'রসিদ নং:' : 'Receipt No:'}{' '}
+                <strong className="font-mono">{correctionTargetPayment.receipt_no}</strong>
               </div>
               <div>
-                বিপরীত রিভার্সাল পরিমাণ:{' '}
+                {language === 'bn' ? 'বিপরীত রিভার্সাল পরিমাণ:' : 'Reversal Amount:'}{' '}
                 <strong className="font-mono">
                   -{formatBDT(correctionTargetPayment.amount, language)}
                 </strong>
@@ -948,7 +977,11 @@ export const MortgageDetailView: React.FC = () => {
               <textarea
                 rows={3}
                 className="w-full p-3 rounded-xl border border-slate-300 text-sm focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20"
-                placeholder="যেমন: ভুলবশত অতিরিক্ত সুদ বা ভুল গ্রাহকের হিসাবে টাকা এন্ট্রি করা হয়েছিল..."
+                placeholder={
+                  language === 'bn'
+                    ? 'যেমন: ভুলবশত অতিরিক্ত সুদ বা ভুল গ্রাহকের হিসাবে টাকা এন্ট্রি করা হয়েছিল...'
+                    : 'e.g. Excess interest entered or recorded under incorrect customer...'
+                }
                 value={correctionReason}
                 onChange={(e) => setCorrectionReason(e.target.value)}
               />
@@ -969,7 +1002,7 @@ export const MortgageDetailView: React.FC = () => {
                 isLoading={correctionMutation.isPending}
               >
                 <RotateCcw className="w-4 h-4 mr-1.5" />
-                <span>রিভার্সাল এন্ট্রি নিশ্চিত করুন</span>
+                <span>{language === 'bn' ? 'রিভার্সাল এন্ট্রি নিশ্চিত করুন' : 'Confirm Reversal Entry'}</span>
               </Button>
             </div>
           </div>

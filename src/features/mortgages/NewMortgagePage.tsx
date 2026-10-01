@@ -169,7 +169,7 @@ export const NewMortgagePage: React.FC = () => {
             {t('mortgages.new_mortgage')}
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            নতুন বন্ধকী ঋণ ও জামানত গ্রহণের হিসাব
+            {language === 'bn' ? 'নতুন বন্ধকী ঋণ ও জামানত গ্রহণের হিসাব' : 'Create new mortgage loan and record collateral'}
           </p>
         </div>
       </div>
@@ -327,7 +327,11 @@ export const NewMortgagePage: React.FC = () => {
               </label>
               <textarea
                 rows={3}
-                placeholder="যেমন: ২২ ক্যারেটের গলার চেইন ও ২ জোড়া বালা, ওজন প্রায় ২৪.৫ গ্রাম। হলমার্কযুক্ত ও ক্যাশমেমো সহ জমা রাখা হলো।"
+                placeholder={
+                  language === 'bn'
+                    ? 'যেমন: ২২ ক্যারেটের গলার চেইন ও ২ জোড়া বালা, ওজন প্রায় ২৪.৫ গ্রাম। হলমার্কযুক্ত ও ক্যাশমেমো সহ জমা রাখা হলো।'
+                    : 'e.g. 22K gold necklace and 2 pairs of bangles, weight ~24.5g. Deposited with hallmark & memo.'
+                }
                 className="w-full p-3 rounded-xl border border-slate-300 bg-white text-sm text-slate-900 focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20"
                 {...register('collateral_description')}
               />
@@ -352,7 +356,7 @@ export const NewMortgagePage: React.FC = () => {
                   className="gap-1.5 text-xs text-emerald-700 border-emerald-300 hover:bg-emerald-50 h-8"
                 >
                   <Camera className="w-3.5 h-3.5" />
-                  <span>ক্যামেরায় ছবি তুলুন</span>
+                  <span>{language === 'bn' ? 'ক্যামেরায় ছবি তুলুন' : 'Take Photo'}</span>
                 </Button>
                 <input
                   id="collateral-file-input"
@@ -384,7 +388,9 @@ export const NewMortgagePage: React.FC = () => {
                 </div>
               ) : (
                 <p className="text-xs text-slate-400 italic">
-                  সোনার গহনা, দলিল বা পণ্যের ছবি তুলুন যা রসিদ ও নথিতে সংরক্ষিত থাকবে।
+                  {language === 'bn'
+                    ? 'সোনার গহনা, দলিল বা পণ্যের ছবি তুলুন যা রসিদ ও নথিতে সংরক্ষিত থাকবে।'
+                    : 'Capture photos of gold jewelry, land deeds or pledge items for official records.'}
                 </p>
               )}
             </div>
