@@ -10,6 +10,12 @@ import type { Customer } from '../../types/database';
 import { useCreateCustomer, useUpdateCustomer } from './useCustomers';
 import { Camera, Image as ImageIcon, User, Trash2, CreditCard } from 'lucide-react';
 import { captureFromCamera, pickFromGallery, readFileAsDataUrl } from '../../lib/media';
+import {
+  compressCustomerAvatar,
+  compressDocumentPhoto,
+  getBase64SizeInBytes,
+  formatBytes,
+} from '../../lib/imageCompressor';
 
 const customerSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -168,6 +174,16 @@ export const CustomerFormDialog: React.FC<CustomerFormDialogProps> = ({
 
   const onSubmit = async (data: CustomerFormData) => {
     try {
+      let finalPhoto = data.photo_path;
+      if (finalPhoto && finalPhoto.startsWith('data:')) {
+        finalPhoto = await compressCustomerAvatar(finalPhoto);
+      }
+
+      let finalNidPhoto = data.nid_photo_path;
+      if (finalNidPhoto && finalNidPhoto.startsWith('data:')) {
+        finalNidPhoto = await compressDocumentPhoto(finalNidPhoto);
+      }
+
       if (customerToEdit) {
         await updateMutation.mutateAsync({
           id: customerToEdit.id,
@@ -175,8 +191,8 @@ export const CustomerFormDialog: React.FC<CustomerFormDialogProps> = ({
           phone: data.phone,
           address: data.address || undefined,
           nid_no: data.nid_no || undefined,
-          photo_path: data.photo_path || undefined,
-          nid_photo_path: data.nid_photo_path || undefined,
+          photo_path: finalPhoto || undefined,
+          nid_photo_path: finalNidPhoto || undefined,
           notes: data.notes || undefined,
         });
       } else {
@@ -185,8 +201,8 @@ export const CustomerFormDialog: React.FC<CustomerFormDialogProps> = ({
           phone: data.phone,
           address: data.address || undefined,
           nid_no: data.nid_no || undefined,
-          photo_path: data.photo_path || undefined,
-          nid_photo_path: data.nid_photo_path || undefined,
+          photo_path: finalPhoto || undefined,
+          nid_photo_path: finalNidPhoto || undefined,
           notes: data.notes || undefined,
         });
       }
@@ -217,6 +233,9 @@ export const CustomerFormDialog: React.FC<CustomerFormDialogProps> = ({
                 >
                   <Trash2 className="w-3 h-3" />
                 </button>
+                <div className="absolute bottom-0 inset-x-0 bg-slate-900/70 text-[9px] text-white text-center font-mono py-0.5">
+                  {formatBytes(getBase64SizeInBytes(photoPreview))}
+                </div>
               </>
             ) : (
               <User className="w-8 h-8 text-slate-400" />
@@ -281,6 +300,9 @@ export const CustomerFormDialog: React.FC<CustomerFormDialogProps> = ({
                 >
                   <Trash2 className="w-3 h-3" />
                 </button>
+                <div className="absolute bottom-0 inset-x-0 bg-slate-900/70 text-[9px] text-white text-center font-mono py-0.5">
+                  {formatBytes(getBase64SizeInBytes(nidPhotoPreview))}
+                </div>
               </>
             ) : (
               <CreditCard className="w-8 h-8 text-slate-400" />

@@ -27,6 +27,11 @@ import {
 } from 'lucide-react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { captureFromCamera, pickFromGallery, readFileAsDataUrl } from '../../lib/media';
+import {
+  compressDocumentPhoto,
+  getBase64SizeInBytes,
+  formatBytes,
+} from '../../lib/imageCompressor';
 import type { CollateralType } from '../../types/database';
 
 const mortgageSchema = z.object({
@@ -153,6 +158,16 @@ export const NewMortgagePage: React.FC = () => {
     try {
       const selectedCustomer = customers.find((c) => c.id === data.customer_id);
 
+      // Ensure all collateral photos are compressed to lightweight sizes (<100KB)
+      const compressedPhotos = await Promise.all(
+        collateralPhotos.map(async (photo) => {
+          if (photo.startsWith('data:')) {
+            return await compressDocumentPhoto(photo);
+          }
+          return photo;
+        })
+      );
+
       const created = await createMortgageMutation.mutateAsync({
         customer_id: data.customer_id,
         principal: Math.round(data.principal),
@@ -161,7 +176,7 @@ export const NewMortgagePage: React.FC = () => {
         due_date: data.due_date,
         collateral_type: data.collateral_type as CollateralType,
         collateral_description: data.collateral_description,
-        collateral_photo_paths: collateralPhotos,
+        collateral_photo_paths: compressedPhotos,
         customer: selectedCustomer,
       });
 
@@ -420,6 +435,9 @@ export const NewMortgagePage: React.FC = () => {
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
+                      <div className="absolute bottom-0 inset-x-0 bg-slate-900/70 text-[9px] text-white text-center font-mono py-0.5">
+                        {formatBytes(getBase64SizeInBytes(photo))}
+                      </div>
                     </div>
                   ))}
                 </div>
