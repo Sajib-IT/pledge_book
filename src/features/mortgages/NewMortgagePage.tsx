@@ -180,7 +180,7 @@ export const NewMortgagePage: React.FC = () => {
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="text-base font-bold flex items-center gap-2">
-                <span>১. গ্রাহক নির্বাচন</span>
+                <span>{t('mortgages.customer_select_title')}</span>
               </CardTitle>
               <Button
                 type="button"
@@ -200,7 +200,7 @@ export const NewMortgagePage: React.FC = () => {
                 {...register('customer_id')}
                 className="w-full h-11 px-3 rounded-xl border border-slate-300 bg-white text-sm text-slate-900 focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20"
               >
-                <option value="">-- গ্রাহক সিলেক্ট করুন --</option>
+                <option value="">{t('mortgages.customer_select_placeholder')}</option>
                 {customers.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name} ({c.phone})
@@ -219,7 +219,7 @@ export const NewMortgagePage: React.FC = () => {
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-bold flex items-center gap-2">
               <Coins className="w-4 h-4 text-emerald-600" />
-              <span>২. টাকার পরিমাণ ও সুদের হার (BDT)</span>
+              <span>{t('mortgages.financial_title')}</span>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -231,7 +231,7 @@ export const NewMortgagePage: React.FC = () => {
                 placeholder="40000"
                 {...register('principal')}
                 error={errors.principal?.message}
-                helperText="টাকা পূর্ণসংখ্যায় (BDT) হিসাব হবে"
+                helperText={t('mortgages.principal_helper')}
               />
 
               <Input
@@ -241,30 +241,34 @@ export const NewMortgagePage: React.FC = () => {
                 placeholder="25.00"
                 {...register('interest_rate')}
                 error={errors.interest_rate?.message}
-                helperText="ডিফল্ট ২৫% ফ্ল্যাট বার্ষিক সুদ"
+                helperText={t('mortgages.interest_helper')}
               />
             </div>
 
             {/* Live Calculation Preview Banner */}
             <div className="p-4 rounded-2xl bg-gradient-to-tr from-emerald-50 via-teal-50/40 to-slate-50 border border-emerald-200/80">
               <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider block mb-2">
-                🧮 লাইভ সুদের হিসাব প্রিভিউ (১ বছর মেয়াদ)
+                🧮 {language === 'en' ? 'Live Interest & Settlement Preview (1-Year Term)' : 'লাইভ সুদের হিসাব প্রিভিউ (১ বছর মেয়াদ)'}
               </span>
               <div className="grid grid-cols-3 gap-2 text-center sm:text-left">
                 <div className="bg-white/80 p-2.5 rounded-xl border border-emerald-100">
-                  <span className="text-[11px] text-slate-500 block">আসল মূলধন</span>
+                  <span className="text-[11px] text-slate-500 block">{t('mortgages.principal')}</span>
                   <span className="text-sm sm:text-base font-bold text-slate-900 font-mono">
                     {formatBDT(watchedPrincipal, language)}
                   </span>
                 </div>
                 <div className="bg-white/80 p-2.5 rounded-xl border border-emerald-100">
-                  <span className="text-[11px] text-slate-500 block">১ বছরের সুদ ({watchedRate}%)</span>
+                  <span className="text-[11px] text-slate-500 block">
+                    {language === 'en' ? `1-Yr Interest (${watchedRate}%)` : `১ বছরের সুদ (${watchedRate}%)`}
+                  </span>
                   <span className="text-sm sm:text-base font-bold text-emerald-700 font-mono">
                     {formatBDT(yearlyInterest, language)}
                   </span>
                 </div>
                 <div className="bg-white/80 p-2.5 rounded-xl border border-emerald-100">
-                  <span className="text-[11px] text-slate-500 block">পরিশোধে মোট দেওয়</span>
+                  <span className="text-[11px] text-slate-500 block">
+                    {language === 'en' ? 'Total Settlement' : 'পরিশোধে মোট দেওয়'}
+                  </span>
                   <span className="text-sm sm:text-base font-bold text-slate-900 font-mono">
                     {formatBDT(settlement.total, language)}
                   </span>
@@ -286,7 +290,7 @@ export const NewMortgagePage: React.FC = () => {
                 type="date"
                 {...register('due_date')}
                 error={errors.due_date?.message}
-                helperText="শুরুর তারিখ থেকে ১ বছর স্বয়ংক্রিয়ভাবে যুক্ত"
+                helperText={language === 'en' ? 'Auto-extended by 1 year from start date' : 'শুরুর তারিখ থেকে ১ বছর স্বয়ংক্রিয়ভাবে যুক্ত'}
               />
             </div>
           </CardContent>
@@ -297,7 +301,7 @@ export const NewMortgagePage: React.FC = () => {
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-bold flex items-center gap-2">
               <Gem className="w-4 h-4 text-emerald-600" />
-              <span>৩. জামানতের বিবরণ ও ছবি</span>
+              <span>{t('mortgages.collateral_title')}</span>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -402,7 +406,7 @@ export const NewMortgagePage: React.FC = () => {
             className="shadow-lg shadow-emerald-600/25 px-8"
           >
             <Plus className="w-4 h-4 mr-2" />
-            <span>বন্ধক ইস্যু করুন</span>
+            <span>{t('mortgages.issue_mortgage_btn')}</span>
           </Button>
         </div>
       </form>

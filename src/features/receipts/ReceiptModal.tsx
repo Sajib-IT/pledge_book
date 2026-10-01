@@ -40,10 +40,10 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
 
   const paymentTypeTitle =
     payment.type === 'interest'
-      ? 'বার্ষিক সুদ আদায় ও ১ বছর মেয়াদ বৃদ্ধি (Renewal)'
+      ? (language === 'bn' ? 'বার্ষিক সুদ আদায় ও ১ বছর মেয়াদ বৃদ্ধি (নবায়ন)' : 'Annual Interest Payment & 1-Year Extension (Renewal)')
       : payment.type === 'full_payment'
-      ? 'আসল + সুদ সম্পূর্ণ পরিশোধ ও বন্ধক সমাপ্তি (Closure)'
-      : 'ভুল পেমেন্ট রিভার্সাল ও সংশোধনী এন্ট্রি (Correction)';
+      ? (language === 'bn' ? 'আসল + সুদ সম্পূর্ণ পরিশোধ ও বন্ধক সমাপ্তি' : 'Principal + Interest Full Settlement & Closure')
+      : (language === 'bn' ? 'ভুল পেমেন্ট রিভার্সাল ও সংশোধনী এন্ট্রি' : 'Payment Reversal & Correction Entry');
 
   // Print action
   const handlePrint = () => {
@@ -72,7 +72,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
       pdf.save(`Receipt_${payment.receipt_no}.pdf`);
     } catch (err) {
       console.error('Error generating PDF:', err);
-      alert('PDF তৈরি করতে সমস্যা হয়েছে। প্রিন্ট অপশন ব্যবহার করুন।');
+      alert(language === 'bn' ? 'PDF তৈরি করতে সমস্যা হয়েছে। প্রিন্ট অপশন ব্যবহার করুন।' : 'Failed to generate PDF. Please use the Print option.');
     } finally {
       setIsDownloading(false);
     }
@@ -80,13 +80,15 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
 
   // Share via WhatsApp / Capacitor Share
   const handleShare = async () => {
-    const text = `*পেমেন্ট রসিদ - ${businessName}*\nরসিদ নং: ${payment.receipt_no}\nগ্রাহক: ${mortgage.customer?.name}\nটাকার পরিমাণ: ${formatBDT(payment.amount, 'bn')}\nতারিখ: ${formatDateDhaka(payment.paid_on, 'bn')}\nবন্ধক নং: ${mortgage.mortgage_no}`;
+    const text = language === 'bn'
+      ? `*পেমেন্ট রসিদ - ${businessName}*\nরসিদ নং: ${payment.receipt_no}\nগ্রাহক: ${mortgage.customer?.name}\nটাকার পরিমাণ: ${formatBDT(payment.amount, 'bn')}\nতারিখ: ${formatDateDhaka(payment.paid_on, 'bn')}\nবন্ধক নং: ${mortgage.mortgage_no}`
+      : `*Payment Receipt - ${businessName}*\nReceipt No: ${payment.receipt_no}\nCustomer: ${mortgage.customer?.name}\nAmount: ${formatBDT(payment.amount, 'en')}\nDate: ${formatDateDhaka(payment.paid_on, 'en')}\nMortgage No: ${mortgage.mortgage_no}`;
 
     try {
       await Share.share({
         title: `Receipt ${payment.receipt_no}`,
         text: text,
-        dialogTitle: 'রসিদ শেয়ার করুন (হোয়াটসঅ্যাপ)',
+        dialogTitle: language === 'bn' ? 'রসিদ শেয়ার করুন (হোয়াটসঅ্যাপ)' : 'Share Receipt (WhatsApp)',
       });
     } catch {
       // Fallback for desktop: Open WhatsApp web
@@ -104,8 +106,8 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
     <Dialog
       isOpen={isOpen}
       onClose={onClose}
-      title="পেমেন্ট রসিদ"
-      description="গ্রাহক কপি ও অফিশিয়াল ভাউচার"
+      title={t('receipts.title')}
+      description={language === 'bn' ? 'গ্রাহক কপি ও অফিশিয়াল ভাউচার' : 'Customer Copy & Official Receipt Voucher'}
       className="max-w-md"
     >
       <div className="space-y-4">
@@ -120,10 +122,10 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
               {businessName}
             </h2>
             <p className="text-[11px] text-slate-500 font-medium">
-              বিশ্বস্ততার সাথে স্বর্ণ ও বন্ধকী ব্যবসা
+              {t('receipts.tagline')}
             </p>
             <p className="text-[10px] text-slate-400 mt-0.5">
-              {businessAddress} • মোবাইল: {businessPhone}
+              {businessAddress} • {t('common.phone')}: {businessPhone}
             </p>
             <div className="mt-2 inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-200">
               <ShieldCheck className="w-3 h-3" />
@@ -134,13 +136,13 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
           {/* Receipt Meta */}
           <div className="flex items-center justify-between text-xs pb-1">
             <div>
-              <span className="text-slate-400 block text-[10px]">রসিদ নম্বর</span>
+              <span className="text-slate-400 block text-[10px]">{t('payments.receipt_no')}</span>
               <span className="font-mono font-bold text-slate-900 text-sm">
                 {payment.receipt_no}
               </span>
             </div>
             <div className="text-right">
-              <span className="text-slate-400 block text-[10px]">তারিখ</span>
+              <span className="text-slate-400 block text-[10px]">{t('payments.paid_on')}</span>
               <span className="font-semibold text-slate-800">
                 {formatDateDhaka(payment.paid_on, language)}
               </span>
@@ -150,23 +152,23 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
           {/* Customer & Mortgage Details */}
           <div className="space-y-1.5 text-xs bg-slate-50 p-3 rounded-xl border border-slate-200/80">
             <div className="flex justify-between">
-              <span className="text-slate-500">গ্রাহকের নাম:</span>
+              <span className="text-slate-500">{t('customers.name')}:</span>
               <span className="font-bold text-slate-800">{mortgage.customer?.name}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-500">মোবাইল:</span>
+              <span className="text-slate-500">{t('common.phone')}:</span>
               <span className="font-mono font-semibold text-slate-700">
                 {mortgage.customer?.phone}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-500">বন্ধক নং:</span>
+              <span className="text-slate-500">{t('mortgages.mortgage_no')}:</span>
               <span className="font-mono font-semibold text-slate-700">
                 {mortgage.mortgage_no}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-500">জামানত:</span>
+              <span className="text-slate-500">{t('mortgages.collateral_type')}:</span>
               <span className="text-slate-700 line-clamp-1 italic max-w-[200px] text-right">
                 {mortgage.collateral_description}
               </span>
@@ -182,24 +184,26 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
               {formatBDT(payment.amount, language)}
             </div>
             <p className="text-[11px] text-emerald-700 mt-1">
-              নগদে বুঝিয়া পাইয়া রশিদ প্রদান করা হলো।
+              {language === 'bn' ? 'নগদে বুঝিয়া পাইয়া রশিদ প্রদান করা হলো।' : 'Received with thanks in cash and receipt issued.'}
             </p>
           </div>
 
           {payment.note && (
             <p className="text-[11px] text-slate-500 italic border-l-2 border-emerald-300 pl-2">
-              মন্তব্য: {payment.note}
+              {t('payments.note')}: {payment.note}
             </p>
           )}
 
           {/* Signatures */}
           <div className="pt-6 flex items-end justify-between text-[11px] text-slate-500">
             <div className="text-center">
-              <div className="w-24 border-t border-slate-300 pt-1">গ্রাহকের স্বাক্ষর</div>
+              <div className="w-24 border-t border-slate-300 pt-1">
+                {language === 'bn' ? 'গ্রাহকের স্বাক্ষর' : "Customer's Signature"}
+              </div>
             </div>
             <div className="text-center">
               <div className="w-28 border-t border-slate-300 pt-1 font-semibold text-slate-800">
-                দায়িত্বপ্রাপ্ত কর্মকর্তা
+                {language === 'bn' ? 'দায়িত্বপ্রাপ্ত কর্মকর্তা' : 'Authorized Officer'}
               </div>
             </div>
           </div>
@@ -215,7 +219,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
             className="gap-1.5 text-xs h-10"
           >
             <Printer className="w-3.5 h-3.5" />
-            <span>প্রিন্ট</span>
+            <span>{language === 'bn' ? 'প্রিন্ট' : 'Print'}</span>
           </Button>
 
           <Button
@@ -238,7 +242,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
             className="gap-1.5 text-xs h-10 bg-teal-600 hover:bg-teal-700 text-white"
           >
             <Share2 className="w-3.5 h-3.5" />
-            <span>শেয়ার</span>
+            <span>{language === 'bn' ? 'শেয়ার' : 'Share'}</span>
           </Button>
         </div>
       </div>

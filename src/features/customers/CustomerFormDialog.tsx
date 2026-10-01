@@ -36,7 +36,7 @@ export const CustomerFormDialog: React.FC<CustomerFormDialogProps> = ({
   onClose,
   customerToEdit,
 }) => {
-  const { t } = useI18n();
+  const { language, t } = useI18n();
   const createMutation = useCreateCustomer();
   const updateMutation = useUpdateCustomer();
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -194,7 +194,7 @@ export const CustomerFormDialog: React.FC<CustomerFormDialogProps> = ({
         {/* Customer Name */}
         <Input
           label={t('customers.name')}
-          placeholder="যেমন: আব্দুর রহিম"
+          placeholder={language === 'bn' ? 'যেমন: আব্দুর রহিম' : 'e.g. Abdur Rahim'}
           {...register('name')}
           error={errors.name?.message}
         />
@@ -210,7 +210,7 @@ export const CustomerFormDialog: React.FC<CustomerFormDialogProps> = ({
         {/* NID */}
         <Input
           label={t('customers.nid')}
-          placeholder="যেমন: 19852691234567890"
+          placeholder={language === 'bn' ? 'যেমন: 19852691234567890' : 'e.g. 19852691234567890'}
           {...register('nid_no')}
           error={errors.nid_no?.message}
         />
@@ -218,7 +218,7 @@ export const CustomerFormDialog: React.FC<CustomerFormDialogProps> = ({
         {/* Address */}
         <Input
           label={t('common.address')}
-          placeholder="গ্রাম, থানা, জেলা"
+          placeholder={language === 'bn' ? 'গ্রাম, থানা, জেলা' : 'Village, Police Station, District'}
           {...register('address')}
           error={errors.address?.message}
         />
@@ -231,7 +231,7 @@ export const CustomerFormDialog: React.FC<CustomerFormDialogProps> = ({
           <textarea
             className="flex w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-sm text-slate-900 placeholder:text-slate-400 transition-colors focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
             rows={2}
-            placeholder="গ্রাহক সম্পর্কে অতিরিক্ত তথ্য..."
+            placeholder={language === 'bn' ? 'গ্রাহক সম্পর্কে অতিরিক্ত তথ্য...' : 'Additional notes about customer...'}
             {...register('notes')}
           />
         </div>

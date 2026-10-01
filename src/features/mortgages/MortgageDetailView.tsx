@@ -13,8 +13,10 @@ import {
   isMortgageOverdue,
   getDaysUntilDue,
   calculateYearlyInterest,
-  calculateCloseAmount,
+  calculateEarlySettlement,
+  calculateRenewWithDiscount,
   getTodayDhakaDateString,
+  type InterestCalculationMode,
 } from '../../lib/calculations';
 import { Button } from '../../components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/card';
@@ -25,8 +27,6 @@ import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import type { Payment } from '../../types/database';
 import {
   ArrowLeft,
-  Calendar,
-  Coins,
   Phone,
   MessageSquare,
   AlertTriangle,
@@ -36,9 +36,9 @@ import {
   RotateCcw,
   Gem,
   Clock,
-  Sparkles,
   ShieldCheck,
   Printer,
+  Tag,
 } from 'lucide-react';
 import { ReceiptModal } from '../receipts/ReceiptModal';
 
@@ -60,6 +60,16 @@ export const MortgageDetailView: React.FC = () => {
   const [paymentDate, setPaymentDate] = useState(getTodayDhakaDateString());
   const [paymentNote, setPaymentNote] = useState('');
   const [correctionReason, setCorrectionReason] = useState('');
+
+  // Close Modal Early Repayment & Discount States
+  const [closeMode, setCloseMode] = useState<InterestCalculationMode>('full_year');
+  const [closeDiscount, setCloseDiscount] = useState<number>(0);
+  const [customCloseInterest, setCustomCloseInterest] = useState<string>('');
+
+  // Renew Modal Discount & Custom Interest States
+  const [renewDiscount, setRenewDiscount] = useState<number>(0);
+  const [customRenewInterest, setCustomRenewInterest] = useState<string>('');
+
   const [successReceipt, setSuccessReceipt] = useState<{
     type: 'renew' | 'close' | 'correction';
     receipt_no: string;
@@ -88,7 +98,25 @@ export const MortgageDetailView: React.FC = () => {
   const isOverdue = isMortgageOverdue(mortgage.due_date, mortgage.status);
   const daysUntilDue = getDaysUntilDue(mortgage.due_date);
   const yearlyInterest = calculateYearlyInterest(mortgage.principal, mortgage.interest_rate);
-  const closeCalculation = calculateCloseAmount(mortgage.principal, mortgage.interest_rate);
+
+  // Early repayment calculation for Close Modal
+  const earlySettlement = calculateEarlySettlement(
+    mortgage.principal,
+    mortgage.interest_rate,
+    mortgage.start_date,
+    paymentDate,
+    closeMode,
+    closeDiscount,
+    customCloseInterest ? Number(customCloseInterest) : undefined
+  );
+
+  // Renewal calculation with discounts
+  const renewCalculation = calculateRenewWithDiscount(
+    mortgage.principal,
+    mortgage.interest_rate,
+    renewDiscount,
+    customRenewInterest ? Number(customRenewInterest) : undefined
+  );
 
   // Phone Call & WhatsApp helpers
   const phone = mortgage.customer?.phone || '';
@@ -110,40 +138,66 @@ export const MortgageDetailView: React.FC = () => {
   // Submit Renew RPC
   const handleConfirmRenew = async () => {
     try {
+      const netAmount = renewCalculation.netInterest;
+      const discountText =
+        renewCalculation.discount > 0
+          ? ` [ছাড়: ${formatBDT(renewCalculation.discount, language)}]`
+          : '';
+      const detailedNote = (paymentNote ? paymentNote + ' ' : '') + `(বার্ষিক সুদ: ${formatBDT(renewCalculation.yearlyInterest, language)}${discountText})`;
+
       const res = await renewMutation.mutateAsync({
         mortgageId: mortgage.id,
         paidOn: paymentDate,
-        note: paymentNote || undefined,
+        note: detailedNote,
+        amount: netAmount,
       });
 
       setIsRenewModalOpen(false);
       setSuccessReceipt({
         type: 'renew',
         receipt_no: (res as any).receipt_no,
-        amount: yearlyInterest,
+        amount: netAmount,
       });
       setPaymentNote('');
+      setRenewDiscount(0);
+      setCustomRenewInterest('');
     } catch (err) {
       alert('রিনিউ সম্পন্ন করতে সমস্যা হয়েছে: ' + (err as Error).message);
     }
   };
 
-  // Submit Close RPC
+  // Submit Close RPC (Supports Early Settlement and Discounts)
   const handleConfirmClose = async () => {
     try {
+      const totalAmount = earlySettlement.total;
+      const discountText =
+        earlySettlement.discount > 0
+          ? ` [ছাড়: ${formatBDT(earlySettlement.discount, language)}]`
+          : '';
+      const modeText =
+        earlySettlement.mode !== 'full_year'
+          ? ` [পদ্ধতি: ${earlySettlement.mode}, অতিবাহিত: ${earlySettlement.daysElapsed} দিন]`
+          : '';
+      const detailedNote =
+        (paymentNote ? paymentNote + ' ' : '') +
+        `(আসল: ${formatBDT(earlySettlement.principal, language)}, নিট সুদ: ${formatBDT(earlySettlement.netInterest, language)}${discountText}${modeText})`;
+
       const res = await closeMutation.mutateAsync({
         mortgageId: mortgage.id,
         paidOn: paymentDate,
-        note: paymentNote || undefined,
+        note: detailedNote,
+        amount: totalAmount,
       });
 
       setIsCloseModalOpen(false);
       setSuccessReceipt({
         type: 'close',
         receipt_no: (res as any).receipt_no,
-        amount: closeCalculation.total,
+        amount: totalAmount,
       });
       setPaymentNote('');
+      setCloseDiscount(0);
+      setCustomCloseInterest('');
     } catch (err) {
       alert('বন্ধক পরিশোধ ও সমাপ্তি সম্পন্ন করতে সমস্যা হয়েছে: ' + (err as Error).message);
     }
@@ -208,7 +262,7 @@ export const MortgageDetailView: React.FC = () => {
               )}
             </div>
             <p className="text-xs text-slate-500 mt-1">
-              শুরুর তারিখ: {formatDateDhaka(mortgage.start_date, language)} • মেয়াদ:{' '}
+              {t('mortgages.start_date')}: {formatDateDhaka(mortgage.start_date, language)} • {t('mortgages.due_date')}:{' '}
               {formatDateDhaka(mortgage.due_date, language)}
             </p>
           </div>
@@ -218,24 +272,27 @@ export const MortgageDetailView: React.FC = () => {
         {mortgage.status === 'active' && (
           <div className="flex items-center gap-2">
             <Button
+              type="button"
+              variant="outline"
+              size="sm"
               onClick={() => {
                 setPaymentDate(getTodayDhakaDateString());
                 setIsRenewModalOpen(true);
               }}
-              variant="outline"
-              className="gap-2 border-blue-300 text-blue-700 hover:bg-blue-50 font-bold text-xs sm:text-sm h-11"
+              className="gap-1.5 border-blue-200 text-blue-700 hover:bg-blue-50 font-bold"
             >
               <RotateCw className="w-4 h-4 text-blue-600" />
               <span>{t('mortgages.renew_btn')}</span>
             </Button>
-
             <Button
+              type="button"
+              variant="primary"
+              size="sm"
               onClick={() => {
                 setPaymentDate(getTodayDhakaDateString());
                 setIsCloseModalOpen(true);
               }}
-              variant="primary"
-              className="gap-2 font-bold text-xs sm:text-sm h-11 shadow-md shadow-emerald-600/25"
+              className="gap-1.5 shadow-md shadow-emerald-700/20 font-bold"
             >
               <CheckCircle2 className="w-4 h-4" />
               <span>{t('mortgages.close_btn')}</span>
@@ -244,273 +301,251 @@ export const MortgageDetailView: React.FC = () => {
         )}
       </div>
 
-      {/* Success Notification Banner */}
+      {/* Success Receipt Alert */}
       {successReceipt && (
-        <div className="p-4 rounded-2xl bg-emerald-600 text-white shadow-lg shadow-emerald-600/25 flex items-center justify-between animate-in zoom-in-95">
+        <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
-              <Sparkles className="w-5 h-5 text-white" />
+            <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0">
+              <CheckCircle2 className="w-5 h-5" />
             </div>
             <div>
-              <h4 className="font-bold text-sm">
-                {successReceipt.type === 'renew'
-                  ? '✅ সুদ গ্রহণ ও ১ বছর মেয়াদ বৃদ্ধি সফল!'
-                  : successReceipt.type === 'close'
-                  ? '🎉 বন্ধক সম্পূর্ণ পরিশোধ ও সমাপ্ত করা হয়েছে!'
-                  : '⚠️ ভুল পেমেন্টের বিপরীত সংশোধনী সফলভাবে নথিভুক্ত হয়েছে'}
-              </h4>
-              <p className="text-xs text-emerald-100 font-mono mt-0.5">
-                রসিদ নং: {successReceipt.receipt_no} • পরিমাণ:{' '}
-                {formatBDT(successReceipt.amount, language)}
+              <p className="text-sm font-bold text-emerald-950">
+                লেনদেন সফলভাবে সম্পন্ন ও সংরক্ষিত হয়েছে
+              </p>
+              <p className="text-xs text-emerald-700 mt-0.5">
+                রসিদ নম্বর: <strong className="font-mono">{successReceipt.receipt_no}</strong> • পরিমাণ:{' '}
+                <strong>{formatBDT(successReceipt.amount, language)}</strong>
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              className="bg-white text-emerald-800 hover:bg-emerald-50 text-xs font-bold border-0 shadow-sm"
-              onClick={() => {
-                const found = payments.find((p) => p.receipt_no === successReceipt.receipt_no);
-                const paymentToView = found || {
-                  id: 'temp',
-                  receipt_no: successReceipt.receipt_no,
-                  mortgage_id: mortgage.id,
-                  paid_on: getTodayDhakaDateString(),
-                  type:
-                    successReceipt.type === 'renew'
-                      ? 'interest'
-                      : successReceipt.type === 'close'
-                      ? 'full_payment'
-                      : 'correction',
-                  amount: successReceipt.amount,
-                  received_by: null,
-                  note: null,
-                  original_payment_id: null,
-                  created_at: new Date().toISOString(),
-                };
-                setSelectedReceiptPayment(paymentToView);
-              }}
-            >
-              <Printer className="w-3.5 h-3.5 mr-1" />
-              <span>রসিদ প্রিন্ট / শেয়ার</span>
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="text-white hover:bg-white/20 text-xs"
-              onClick={() => setSuccessReceipt(null)}
-            >
-              {t('common.close')}
-            </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const matchedPayment = payments.find((p) => p.receipt_no === successReceipt.receipt_no) || {
+                id: 'temp-id',
+                receipt_no: successReceipt.receipt_no,
+                mortgage_id: mortgage.id,
+                paid_on: paymentDate,
+                type: successReceipt.type === 'renew' ? 'interest' : 'full_payment',
+                amount: successReceipt.amount,
+                received_by: null,
+                note: paymentNote,
+                original_payment_id: null,
+                created_at: new Date().toISOString(),
+              };
+              setSelectedReceiptPayment(matchedPayment as Payment);
+            }}
+            className="gap-1.5 border-emerald-300 text-emerald-800 hover:bg-emerald-100/60 font-bold shrink-0"
+          >
+            <Printer className="w-4 h-4 text-emerald-700" />
+            <span>রসিদ প্রিন্ট / শেয়ার (Receipt)</span>
+          </Button>
+        </div>
+      )}
+
+      {/* Overdue Alert Banner */}
+      {isOverdue && (
+        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 flex items-start gap-3 text-rose-900">
+          <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+          <div className="flex-1 text-xs sm:text-sm">
+            <p className="font-bold">
+              সতর্কতা: এই বন্ধকটির মেয়াদ {Math.abs(daysUntilDue)} দিন আগে উত্তীর্ণ হয়েছে!
+            </p>
+            <p className="text-rose-700 text-xs mt-0.5">
+              অনতিবিলম্বে গ্রাহকের সাথে যোগাযোগ করে বার্ষিক সুদ আদায়পূর্বক নবায়ন অথবা আসল+সুদ সম্পূর্ণ আদায় করুন।
+            </p>
           </div>
         </div>
       )}
 
-      {/* 2-Column Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Left Column: Customer & Financials (2 cols) */}
-        <div className="md:col-span-2 space-y-6">
-          {/* Financial Breakdown Card */}
-          <Card className="border-slate-200">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-bold flex items-center gap-2">
-                <Coins className="w-4 h-4 text-emerald-600" />
-                <span>আর্থিক হিসাব ও সুদের বিবরণ</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
-                  <span className="text-xs text-slate-500 font-medium block">আসল মূলধন</span>
-                  <span className="text-xl font-black text-slate-900 font-mono block mt-1">
-                    {formatBDT(mortgage.principal, language)}
-                  </span>
-                </div>
-                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
-                  <span className="text-xs text-slate-500 font-medium block">
-                    বার্ষিক সুদ ({mortgage.interest_rate}%)
-                  </span>
-                  <span className="text-xl font-black text-emerald-700 font-mono block mt-1">
-                    {formatBDT(yearlyInterest, language)}
-                  </span>
-                </div>
-                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 col-span-2 sm:col-span-1">
-                  <span className="text-xs text-slate-500 font-medium block">পরিশোধে মোট দেওয়</span>
-                  <span className="text-xl font-black text-slate-900 font-mono block mt-1">
-                    {formatBDT(closeCalculation.total, language)}
-                  </span>
-                </div>
-              </div>
-
-              {/* Due Date Alert Box */}
-              <div
-                className={`mt-4 p-3.5 rounded-xl border flex items-center justify-between text-xs ${
-                  isOverdue
-                    ? 'bg-rose-50 border-rose-200 text-rose-800'
-                    : daysUntilDue <= 15
-                    ? 'bg-amber-50 border-amber-200 text-amber-800'
-                    : 'bg-emerald-50 border-emerald-200 text-emerald-800'
-                }`}
-              >
-                <div className="flex items-center gap-2 font-semibold">
-                  <Clock className="w-4 h-4 shrink-0" />
-                  <span>
-                    পরিশোধের মেয়াদ: <strong>{formatDateDhaka(mortgage.due_date, language)}</strong>
-                  </span>
-                </div>
-                <span className="font-bold">
-                  {isOverdue
-                    ? `⚠️ ${Math.abs(daysUntilDue)} দিন বিলম্বিত`
-                    : `${daysUntilDue} দিন অবশিষ্ট`}
+      {/* Main Grid: 2 columns on desktop */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Column (2 Cols): Financial Summary & Payment History */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Financial Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <Card className="border-slate-200">
+              <CardContent className="p-4">
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">
+                  {t('mortgages.principal')}
                 </span>
-              </div>
-            </CardContent>
-          </Card>
+                <div className="text-xl sm:text-2xl font-black text-slate-900 font-mono mt-1">
+                  {formatBDT(mortgage.principal, language)}
+                </div>
+                <span className="text-[11px] text-slate-400 mt-1 block">মূল ঋণ হিসাব</span>
+              </CardContent>
+            </Card>
 
-          {/* Collateral Card */}
+            <Card className="border-slate-200">
+              <CardContent className="p-4">
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">
+                  {t('mortgages.calculated_yearly_interest')}
+                </span>
+                <div className="text-xl sm:text-2xl font-black text-emerald-700 font-mono mt-1">
+                  {formatBDT(yearlyInterest, language)}
+                </div>
+                <span className="text-[11px] text-slate-400 mt-1 block">
+                  হার: {mortgage.interest_rate}% বার্ষিক ফ্ল্যাট
+                </span>
+              </CardContent>
+            </Card>
+
+            <Card className="border-slate-200">
+              <CardContent className="p-4">
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">
+                  ১ বছরে মোট নিষ্পত্তি
+                </span>
+                <div className="text-xl sm:text-2xl font-black text-blue-900 font-mono mt-1">
+                  {formatBDT(mortgage.principal + yearlyInterest, language)}
+                </div>
+                <span className="text-[11px] text-slate-400 mt-1 block">আসল + ১ বছরের সুদ</span>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Collateral Details Card */}
           <Card className="border-slate-200">
             <CardHeader className="pb-3">
-              <CardTitle className="text-base font-bold flex items-center gap-2">
-                <Gem className="w-4 h-4 text-emerald-600" />
-                <span>জামানতের বিবরণ ও ছবি</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
               <div className="flex items-center gap-2">
-                <Badge variant="outline" className="capitalize text-xs font-bold text-slate-700">
-                  {t(`mortgages.collateral_types.${mortgage.collateral_type}`, mortgage.collateral_type)}
-                </Badge>
-                {mortgage.collateral_returned_at && (
-                  <Badge variant="closed" className="text-emerald-700 bg-emerald-50 border-emerald-200">
-                    জামানত ফেরত সম্পন্ন
-                  </Badge>
-                )}
+                <Gem className="w-4 h-4 text-emerald-600" />
+                <CardTitle className="text-base font-bold">
+                  {t('mortgages.collateral_desc')}
+                </CardTitle>
               </div>
-              <p className="text-sm text-slate-800 bg-slate-50 p-3.5 rounded-xl border border-slate-200/80 leading-relaxed">
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-800 leading-relaxed font-medium">
                 {mortgage.collateral_description}
-              </p>
+              </div>
 
+              {/* Photos Gallery */}
               {mortgage.collateral_photo_paths && mortgage.collateral_photo_paths.length > 0 && (
-                <div className="grid grid-cols-3 gap-3 pt-2">
-                  {mortgage.collateral_photo_paths.map((p, idx) => (
-                    <div
-                      key={idx}
-                      className="rounded-xl overflow-hidden aspect-square border border-slate-200 bg-slate-100"
-                    >
-                      <img src={p} alt="Collateral" className="w-full h-full object-cover" />
-                    </div>
-                  ))}
+                <div className="space-y-2">
+                  <span className="text-xs font-bold text-slate-600 block">
+                    সংযুক্ত জামানতের ছবিসমূহ:
+                  </span>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {mortgage.collateral_photo_paths.map((p, idx) => (
+                      <div
+                        key={idx}
+                        className="aspect-square rounded-xl bg-slate-100 border border-slate-200 overflow-hidden"
+                      >
+                        <img
+                          src={p}
+                          alt={`Collateral ${idx + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </CardContent>
           </Card>
 
-          {/* Payment History Timeline */}
+          {/* Payment History Timeline (Strictly Immutable, Corrections Only) */}
           <Card className="border-slate-200">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-base font-bold flex items-center gap-2">
+                <div className="flex items-center gap-2">
                   <FileText className="w-4 h-4 text-emerald-600" />
-                  <span>{t('mortgages.payment_history')}</span>
-                </CardTitle>
-                <span className="text-xs font-semibold text-slate-500">
-                  {payments.length} টি লেনদেন
+                  <CardTitle className="text-base font-bold">
+                    {t('mortgages.payment_history')}
+                  </CardTitle>
+                </div>
+                <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
+                  মোট {payments.length} টি লেনদেন
                 </span>
               </div>
             </CardHeader>
             <CardContent>
               {payments.length === 0 ? (
-                <p className="text-xs text-slate-400 italic text-center py-4">
-                  এখনো কোনো পেমেন্ট জমা হয়নি।
-                </p>
+                <div className="p-6 text-center text-xs text-slate-400 border border-dashed border-slate-200 rounded-xl">
+                  এখনো কোনো কিস্তি বা সুদ পরিশোধের রেকর্ড নেই।
+                </div>
               ) : (
-                <div className="space-y-3">
+                <div className="divide-y divide-slate-100">
                   {payments.map((p) => {
-                    const isReversal = p.type === 'correction' || p.amount < 0;
+                    const isCorrection = p.type === 'correction';
+                    const isFullPayment = p.type === 'full_payment';
+
                     return (
                       <div
                         key={p.id}
-                        className={`p-3.5 rounded-xl border transition-all ${
-                          isReversal
-                            ? 'bg-rose-50/50 border-rose-200 text-rose-900'
-                            : 'bg-white border-slate-200 hover:border-slate-300'
+                        className={`py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                          isCorrection ? 'bg-rose-50/40 -mx-4 px-4 rounded-xl' : ''
                         }`}
                       >
-                        <div className="flex items-center justify-between gap-2">
+                        <div className="space-y-1">
                           <div className="flex items-center gap-2">
-                            <span className="font-mono text-xs font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                            <span className="font-mono text-xs font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded">
                               {p.receipt_no}
                             </span>
                             <Badge
                               variant={
-                                p.type === 'interest'
-                                  ? 'interest'
-                                  : p.type === 'full_payment'
-                                  ? 'full'
-                                  : 'overdue'
+                                isCorrection
+                                  ? 'reversal'
+                                  : isFullPayment
+                                  ? 'closed'
+                                  : 'active'
                               }
-                              className="text-[10px]"
                             >
-                              {p.type === 'interest'
-                                ? t('payments.type_interest')
-                                : p.type === 'full_payment'
+                              {isCorrection
+                                ? t('payments.type_correction')
+                                : isFullPayment
                                 ? t('payments.type_full_payment')
-                                : t('payments.type_correction')}
+                                : t('payments.type_interest')}
                             </Badge>
                           </div>
-
-                          <div className="text-right">
-                            <span
-                              className={`text-sm sm:text-base font-black font-mono ${
-                                isReversal ? 'text-rose-600' : 'text-emerald-700'
-                              }`}
-                            >
-                              {formatBDT(p.amount, language)}
-                            </span>
-                          </div>
+                          <p className="text-xs text-slate-500">
+                            {t('payments.paid_on')}: {formatDateDhaka(p.paid_on, language)}
+                            {p.receiver_profile && (
+                              <span> • {t('payments.received_by')}: {p.receiver_profile.name}</span>
+                            )}
+                          </p>
+                          {p.note && (
+                            <p className="text-xs text-slate-600 italic mt-0.5">
+                              {p.note}
+                            </p>
+                          )}
                         </div>
 
-                        <div className="flex items-center justify-between text-xs text-slate-500 mt-2 pt-2 border-t border-slate-100">
-                          <div className="flex items-center gap-1.5">
-                            <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                            <span>{formatDateDhaka(p.paid_on, language)}</span>
-                          </div>
+                        <div className="flex items-center justify-between sm:justify-end gap-3 pt-1 sm:pt-0">
+                          <span
+                            className={`font-mono text-base font-black ${
+                              p.amount < 0
+                                ? 'text-rose-600'
+                                : 'text-slate-900'
+                            }`}
+                          >
+                            {formatBDT(p.amount, language)}
+                          </span>
 
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-1">
                             <button
                               type="button"
                               onClick={() => setSelectedReceiptPayment(p)}
-                              className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:text-emerald-800 transition-colors"
-                              title="রসিদ দেখুন / ডাউনলোড / শেয়ার করুন"
+                              title="রসিদ দেখুন ও প্রিন্ট করুন"
+                              className="p-1.5 rounded-lg text-emerald-700 hover:bg-emerald-50 transition-colors"
                             >
-                              <Printer className="w-3 h-3" />
-                              <span>রসিদ</span>
+                              <Printer className="w-4 h-4" />
                             </button>
 
-                            {/* Reversal / Correction Button */}
-                            {!isReversal && (
+                            {/* Correction Button (Only for positive payments) */}
+                            {p.amount > 0 && !isCorrection && (
                               <button
                                 type="button"
-                                onClick={() => {
-                                  setCorrectionTargetPayment(p);
-                                  setCorrectionReason('');
-                                }}
-                                className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-400 hover:text-rose-600 transition-colors"
-                                title="ভুল সংশোধনী এন্ট্রি যোগ করুন"
+                                onClick={() => setCorrectionTargetPayment(p)}
+                                title={t('payments.add_correction')}
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
                               >
-                                <RotateCcw className="w-3 h-3" />
-                                <span>{t('payments.add_correction')}</span>
+                                <RotateCcw className="w-4 h-4" />
                               </button>
                             )}
                           </div>
                         </div>
-
-                        {p.note && (
-                          <p className="text-xs text-slate-600 italic mt-1.5 pl-2 border-l-2 border-slate-200">
-                            {p.note}
-                          </p>
-                        )}
                       </div>
                     );
                   })}
@@ -520,33 +555,22 @@ export const MortgageDetailView: React.FC = () => {
           </Card>
         </div>
 
-        {/* Right Column: Customer Card */}
+        {/* Right Column (1 Col): Customer Card */}
         <div className="space-y-6">
           <Card className="border-slate-200">
             <CardHeader className="pb-3">
-              <CardTitle className="text-base font-bold flex items-center gap-2">
-                <span>গ্রাহক পরিচিতি</span>
+              <CardTitle className="text-base font-bold">
+                {t('mortgages.customer')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-lg shrink-0">
-                  {mortgage.customer?.photo_path ? (
-                    <img
-                      src={mortgage.customer.photo_path}
-                      alt={mortgage.customer.name}
-                      className="w-full h-full object-cover rounded-xl"
-                    />
-                  ) : (
-                    mortgage.customer?.name.charAt(0) || 'গ'
-                  )}
-                </div>
-                <div>
-                  <h4 className="font-bold text-base text-slate-900 leading-snug">
-                    {mortgage.customer?.name}
-                  </h4>
-                  <p className="text-xs text-slate-500 font-medium">{mortgage.customer?.phone}</p>
-                </div>
+              <div>
+                <h3 className="font-bold text-base text-slate-900">
+                  {mortgage.customer?.name}
+                </h3>
+                <p className="text-xs text-slate-500 font-mono mt-0.5">
+                  {mortgage.customer?.phone}
+                </p>
               </div>
 
               {/* Action Buttons: Call & WhatsApp */}
@@ -559,7 +583,7 @@ export const MortgageDetailView: React.FC = () => {
                   className="gap-1.5 text-xs border-emerald-300 text-emerald-700 hover:bg-emerald-50 h-9"
                 >
                   <Phone className="w-3.5 h-3.5" />
-                  <span>কল করুন</span>
+                  <span>{t('mortgages.call')}</span>
                 </Button>
                 <Button
                   type="button"
@@ -569,20 +593,20 @@ export const MortgageDetailView: React.FC = () => {
                   className="gap-1.5 text-xs border-teal-300 text-teal-700 hover:bg-teal-50 h-9"
                 >
                   <MessageSquare className="w-3.5 h-3.5 text-teal-600" />
-                  <span>হোয়াটসঅ্যাপ</span>
+                  <span>{t('mortgages.whatsapp')}</span>
                 </Button>
               </div>
 
               {mortgage.customer?.address && (
                 <div className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
-                  <span className="font-bold text-slate-700 block mb-0.5">ঠিকানা:</span>
+                  <span className="font-bold text-slate-700 block mb-0.5">{t('common.address')}:</span>
                   <span>{mortgage.customer.address}</span>
                 </div>
               )}
 
               {mortgage.customer?.nid_no && (
                 <div className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
-                  <span className="font-bold text-slate-700 block mb-0.5">NID নম্বর:</span>
+                  <span className="font-bold text-slate-700 block mb-0.5">{t('customers.nid')}:</span>
                   <span className="font-mono">{mortgage.customer.nid_no}</span>
                 </div>
               )}
@@ -591,7 +615,7 @@ export const MortgageDetailView: React.FC = () => {
         </div>
       </div>
 
-      {/* MODAL 1: RENEW CONFIRMATION DIALOG */}
+      {/* MODAL 1: RENEW CONFIRMATION DIALOG (With Discount & Underpayment support) */}
       <Dialog
         isOpen={isRenewModalOpen}
         onClose={() => setIsRenewModalOpen(false)}
@@ -599,16 +623,64 @@ export const MortgageDetailView: React.FC = () => {
         description={t('mortgages.renew_dialog_desc')}
       >
         <div className="space-y-4">
-          <div className="p-4 rounded-2xl bg-blue-50/70 border border-blue-200 text-center">
+          {/* Financial Breakdown */}
+          <div className="p-4 rounded-2xl bg-blue-50/70 border border-blue-200 text-center space-y-2">
             <span className="text-xs font-semibold text-blue-700 uppercase tracking-wider block">
-              প্রদেয় সুদের পরিমাণ
+              প্রদেয় নিট সুদের পরিমাণ
             </span>
-            <div className="text-2xl sm:text-3xl font-black text-blue-900 font-mono mt-1">
-              {formatBDT(yearlyInterest, language)}
+            <div className="text-2xl sm:text-3xl font-black text-blue-900 font-mono">
+              {formatBDT(renewCalculation.netInterest, language)}
             </div>
-            <p className="text-xs text-blue-600 mt-1">
-              মূল আসল {formatBDT(mortgage.principal, language)} অপরিবর্তিত থাকবে।
+            <div className="flex items-center justify-center gap-3 text-xs text-blue-700 pt-1">
+              <span>নির্ধারিত সুদ: {formatBDT(renewCalculation.yearlyInterest, language)}</span>
+              {renewCalculation.discount > 0 && (
+                <span className="font-bold text-rose-600">
+                  ছাড়: -{formatBDT(renewCalculation.discount, language)}
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-blue-600 border-t border-blue-200/60 pt-1.5">
+              মূল আসল {formatBDT(mortgage.principal, language)} অপরিবর্তিত থাকবে ও মেয়াদ +১ বছর বৃদ্ধি পাবে।
             </p>
+          </div>
+
+          {/* Discount / Underpayment Section */}
+          <div className="space-y-2 p-3 bg-slate-50 rounded-xl border border-slate-200">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                <Tag className="w-3.5 h-3.5 text-emerald-600" />
+                <span>{t('mortgages.discount')}</span>
+              </label>
+              <div className="flex items-center gap-1">
+                {[0, 500, 1000].map((disc) => (
+                  <button
+                    key={disc}
+                    type="button"
+                    onClick={() => {
+                      setRenewDiscount(disc);
+                      setCustomRenewInterest('');
+                    }}
+                    className={`px-2 py-0.5 rounded text-[11px] font-bold border transition-colors ${
+                      renewDiscount === disc && !customRenewInterest
+                        ? 'bg-emerald-600 text-white border-emerald-600'
+                        : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-100'
+                    }`}
+                  >
+                    ৳ {disc}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <Input
+              type="number"
+              step="100"
+              placeholder="যেমন: ৫০০ বা ১,০০০ টাকা ছাড়"
+              value={renewDiscount || ''}
+              onChange={(e) => {
+                setRenewDiscount(Number(e.target.value) || 0);
+                setCustomRenewInterest('');
+              }}
+            />
           </div>
 
           <Input
@@ -620,7 +692,7 @@ export const MortgageDetailView: React.FC = () => {
 
           <Input
             label={t('payments.note')}
-            placeholder="নবায়ন সংক্রান্ত মন্তব্য (ঐচ্ছিক)"
+            placeholder="নবায়ন ও ছাড় সংক্রান্ত মন্তব্য (ঐচ্ছিক)"
             value={paymentNote}
             onChange={(e) => setPaymentNote(e.target.value)}
           />
@@ -646,7 +718,7 @@ export const MortgageDetailView: React.FC = () => {
         </div>
       </Dialog>
 
-      {/* MODAL 2: CLOSE CONFIRMATION DIALOG */}
+      {/* MODAL 2: CLOSE CONFIRMATION DIALOG (With Early Repayment Calculator & Discount) */}
       <Dialog
         isOpen={isCloseModalOpen}
         onClose={() => setIsCloseModalOpen(false)}
@@ -654,17 +726,163 @@ export const MortgageDetailView: React.FC = () => {
         description={t('mortgages.close_dialog_desc')}
       >
         <div className="space-y-4">
-          <div className="p-4 rounded-2xl bg-emerald-50/80 border border-emerald-200 text-center">
-            <span className="text-xs font-semibold text-emerald-800 uppercase tracking-wider block">
-              সম্পূর্ণ নিষ্পত্তির মোট পরিমাণ
-            </span>
-            <div className="text-2xl sm:text-3xl font-black text-emerald-900 font-mono mt-1">
-              {formatBDT(closeCalculation.total, language)}
+          {/* Early Repayment Notification */}
+          {earlySettlement.isEarly && (
+            <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-start gap-2.5">
+              <Clock className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <strong className="block font-bold">
+                  {t('mortgages.early_settlement')} ({earlySettlement.daysElapsed} দিন / {earlySettlement.monthsElapsed} মাস অতিবাহিত)
+                </strong>
+                <p className="text-amber-700 text-[11px] mt-0.5">
+                  {t('mortgages.early_notice')}
+                </p>
+              </div>
             </div>
-            <p className="text-xs text-emerald-700 mt-1">
-              আসল {formatBDT(closeCalculation.principal, language)} + সুদ{' '}
-              {formatBDT(closeCalculation.interest, language)}
-            </p>
+          )}
+
+          {/* Interest Calculation Mode Selector */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-slate-700 block">
+              {t('mortgages.repayment_mode')}
+            </label>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setCloseMode('full_year');
+                  setCustomCloseInterest('');
+                }}
+                className={`p-2 rounded-xl text-xs font-bold border text-left transition-all ${
+                  closeMode === 'full_year'
+                    ? 'border-emerald-600 bg-emerald-50 text-emerald-800 ring-2 ring-emerald-500/20'
+                    : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
+                }`}
+              >
+                <span className="block text-[10px] text-slate-500 font-normal">১ বছর চুক্তি</span>
+                <span>{t('mortgages.mode_full_year')}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setCloseMode('monthly');
+                  setCustomCloseInterest('');
+                }}
+                className={`p-2 rounded-xl text-xs font-bold border text-left transition-all ${
+                  closeMode === 'monthly'
+                    ? 'border-emerald-600 bg-emerald-50 text-emerald-800 ring-2 ring-emerald-500/20'
+                    : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
+                }`}
+              >
+                <span className="block text-[10px] text-slate-500 font-normal">{earlySettlement.monthsElapsed} মাস</span>
+                <span>{t('mortgages.mode_monthly')}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setCloseMode('daily');
+                  setCustomCloseInterest('');
+                }}
+                className={`p-2 rounded-xl text-xs font-bold border text-left transition-all ${
+                  closeMode === 'daily'
+                    ? 'border-emerald-600 bg-emerald-50 text-emerald-800 ring-2 ring-emerald-500/20'
+                    : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
+                }`}
+              >
+                <span className="block text-[10px] text-slate-500 font-normal">{earlySettlement.daysElapsed} দিন</span>
+                <span>{t('mortgages.mode_daily')}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setCloseMode('custom')}
+                className={`p-2 rounded-xl text-xs font-bold border text-left transition-all ${
+                  closeMode === 'custom'
+                    ? 'border-emerald-600 bg-emerald-50 text-emerald-800 ring-2 ring-emerald-500/20'
+                    : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
+                }`}
+              >
+                <span className="block text-[10px] text-slate-500 font-normal">সমঝোতা</span>
+                <span>{t('mortgages.mode_custom')}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Custom Interest Input if custom mode selected */}
+          {closeMode === 'custom' && (
+            <Input
+              label={t('mortgages.custom_interest')}
+              type="number"
+              placeholder="আদায়কৃত সুদের পরিমাণ লিখুন"
+              value={customCloseInterest}
+              onChange={(e) => setCustomCloseInterest(e.target.value)}
+            />
+          )}
+
+          {/* Discount / Waiver Input */}
+          <div className="space-y-2 p-3 bg-slate-50 rounded-xl border border-slate-200">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                <Tag className="w-3.5 h-3.5 text-emerald-600" />
+                <span>{t('mortgages.discount')}</span>
+              </label>
+              <div className="flex items-center gap-1">
+                {[0, 500, 1000].map((disc) => (
+                  <button
+                    key={disc}
+                    type="button"
+                    onClick={() => setCloseDiscount(disc)}
+                    className={`px-2 py-0.5 rounded text-[11px] font-bold border transition-colors ${
+                      closeDiscount === disc
+                        ? 'bg-emerald-600 text-white border-emerald-600'
+                        : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-100'
+                    }`}
+                  >
+                    ৳ {disc}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <Input
+              type="number"
+              step="100"
+              placeholder={t('mortgages.discount_placeholder')}
+              value={closeDiscount || ''}
+              onChange={(e) => setCloseDiscount(Number(e.target.value) || 0)}
+            />
+          </div>
+
+          {/* Final Financial Breakdown Summary Box */}
+          <div className="p-4 rounded-2xl bg-gradient-to-tr from-emerald-50 to-teal-50/50 border border-emerald-200">
+            <div className="space-y-1.5 text-xs text-slate-700 pb-2 border-b border-emerald-200/60">
+              <div className="flex justify-between">
+                <span>মূল আসল (Principal):</span>
+                <span className="font-mono font-bold">{formatBDT(earlySettlement.principal, language)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>ধার্যকৃত সুদ ({earlySettlement.mode}):</span>
+                <span className="font-mono font-bold text-emerald-700">
+                  +{formatBDT(earlySettlement.calculatedInterest, language)}
+                </span>
+              </div>
+              {earlySettlement.discount > 0 && (
+                <div className="flex justify-between text-rose-600 font-bold">
+                  <span>ছাড় / ডিসকাউন্ট (Discount):</span>
+                  <span className="font-mono">-{formatBDT(earlySettlement.discount, language)}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="pt-2 text-center">
+              <span className="text-xs font-semibold text-emerald-800 uppercase tracking-wider block">
+                {t('mortgages.net_total')}
+              </span>
+              <div className="text-2xl sm:text-3xl font-black text-emerald-950 font-mono mt-0.5">
+                {formatBDT(earlySettlement.total, language)}
+              </div>
+            </div>
           </div>
 
           <Input
@@ -729,11 +947,10 @@ export const MortgageDetailView: React.FC = () => {
               </label>
               <textarea
                 rows={3}
-                required
-                placeholder="যেমন: ভুলবশত ভুল গ্রাহকের একাউন্টে এন্ট্রি দেওয়া হয়েছিল..."
+                className="w-full p-3 rounded-xl border border-slate-300 text-sm focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20"
+                placeholder="যেমন: ভুলবশত অতিরিক্ত সুদ বা ভুল গ্রাহকের হিসাবে টাকা এন্ট্রি করা হয়েছিল..."
                 value={correctionReason}
                 onChange={(e) => setCorrectionReason(e.target.value)}
-                className="w-full p-3 rounded-xl border border-slate-300 text-sm text-slate-900 focus:outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20"
               />
             </div>
 
@@ -759,12 +976,12 @@ export const MortgageDetailView: React.FC = () => {
         )}
       </Dialog>
 
-      {/* MODAL 4: RECEIPT MODAL */}
+      {/* DIGITAL RECEIPT MODAL */}
       <ReceiptModal
-        isOpen={Boolean(selectedReceiptPayment)}
-        onClose={() => setSelectedReceiptPayment(null)}
         payment={selectedReceiptPayment}
         mortgage={mortgage}
+        isOpen={Boolean(selectedReceiptPayment)}
+        onClose={() => setSelectedReceiptPayment(null)}
       />
     </div>
   );

@@ -85,7 +85,9 @@ export const ReportsPage: React.FC = () => {
     link.click();
     document.body.removeChild(link);
 
-    setDownloadSuccess('পোর্টফোলিও CSV ডাউনলোড সম্পন্ন হয়েছে');
+    setDownloadSuccess(
+      language === 'bn' ? 'পোর্টফোলিও CSV ডাউনলোড সম্পন্ন হয়েছে' : 'Portfolio CSV downloaded successfully'
+    );
     setTimeout(() => setDownloadSuccess(null), 3000);
   };
 
@@ -148,7 +150,11 @@ export const ReportsPage: React.FC = () => {
     link.click();
     document.body.removeChild(link);
 
-    setDownloadSuccess('পেমেন্ট অডিট লগ CSV ডাউনলোড সম্পন্ন হয়েছে');
+    setDownloadSuccess(
+      language === 'bn'
+        ? 'পেমেন্ট অডিট লগ CSV ডাউনলোড সম্পন্ন হয়েছে'
+        : 'Payment Audit Log CSV downloaded successfully'
+    );
     setTimeout(() => setDownloadSuccess(null), 3000);
   };
 
@@ -160,14 +166,16 @@ export const ReportsPage: React.FC = () => {
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
               <ShieldCheck className="w-3 h-3 inline mr-1" />
-              মালিকের জন্য সংরক্ষিত (Owner Only)
+              {language === 'bn' ? 'মালিকের জন্য সংরক্ষিত' : 'Owner Only'}
             </span>
           </div>
           <h1 className="text-2xl font-black text-slate-900 tracking-tight mt-1">
-            আর্থিক রিপোর্ট ও বিশ্লেষণ (Financial Reports)
+            {language === 'bn' ? 'আর্থিক রিপোর্ট ও বিশ্লেষণ' : 'Financial Reports & Analytics'}
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            ব্যবসায়িক আয়-ব্যয়, সুদের হার ও পোর্টফোলিও হিসাব
+            {language === 'bn'
+              ? 'ব্যবসায়িক আয়-ব্যয়, সুদের হার ও পোর্টফোলিও হিসাব'
+              : 'Business income, interest projections & portfolio breakdown'}
           </p>
         </div>
 
@@ -181,7 +189,7 @@ export const ReportsPage: React.FC = () => {
             className="gap-1.5 text-xs text-slate-700 border-slate-300 font-bold h-10"
           >
             <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-            <span>বন্ধক CSV</span>
+            <span>{language === 'bn' ? 'বন্ধক CSV' : 'Mortgages CSV'}</span>
           </Button>
 
           <Button
@@ -192,7 +200,7 @@ export const ReportsPage: React.FC = () => {
             className="gap-1.5 text-xs font-bold h-10 shadow-md shadow-emerald-600/20"
           >
             <Download className="w-4 h-4" />
-            <span>পেমেন্ট অডিট CSV</span>
+            <span>{language === 'bn' ? 'পেমেন্ট অডিট CSV' : 'Payments CSV'}</span>
           </Button>
         </div>
       </div>
@@ -209,7 +217,7 @@ export const ReportsPage: React.FC = () => {
         <Card className="p-5 border-emerald-100 bg-gradient-to-tr from-white to-emerald-50/30">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-              চলতি মাসের মোট আয়
+              {language === 'bn' ? 'চলতি মাসের মোট আয়' : 'Income This Month'}
             </span>
             <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
               <Calendar className="w-4 h-4" />
@@ -219,14 +227,16 @@ export const ReportsPage: React.FC = () => {
             {formatBDT(activeStats.income_this_month, language)}
           </div>
           <span className="text-[11px] text-slate-400 mt-1 block">
-            চলতি মাসে সংগৃহীত আসল ও সুদের মোট পরিমাণ
+            {language === 'bn'
+              ? 'চলতি মাসে সংগৃহীত আসল ও সুদের মোট পরিমাণ'
+              : 'Total principal and interest collected this month'}
           </span>
         </Card>
 
         <Card className="p-5 border-blue-100 bg-gradient-to-tr from-white to-blue-50/30">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-              চলতি অর্থবছরে মোট আয়
+              {language === 'bn' ? 'চলতি অর্থবছরে মোট আয়' : 'Income This Year'}
             </span>
             <div className="w-8 h-8 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center">
               <TrendingUp className="w-4 h-4" />
@@ -236,14 +246,16 @@ export const ReportsPage: React.FC = () => {
             {formatBDT(activeStats.income_this_year, language)}
           </div>
           <span className="text-[11px] text-slate-400 mt-1 block">
-            ১ জানুয়ারি থেকে আজ পর্যন্ত মোট আদায়কৃত তহবিল
+            {language === 'bn'
+              ? '১ জানুয়ারি থেকে আজ পর্যন্ত মোট আদায়কৃত তহবিল'
+              : 'Total funds collected from Jan 1 to date'}
           </span>
         </Card>
 
         <Card className="p-5 border-slate-200 bg-white sm:col-span-2 lg:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-              বর্তমান অনাদায়ী মূলধন (Outstanding)
+              {language === 'bn' ? 'বর্তমান অনাদায়ী মূলধন' : 'Outstanding Principal'}
             </span>
             <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center">
               <Coins className="w-4 h-4" />
@@ -253,7 +265,9 @@ export const ReportsPage: React.FC = () => {
             {formatBDT(activeStats.total_outstanding_principal, language)}
           </div>
           <span className="text-[11px] text-slate-400 mt-1 block">
-            বাজারের চলমান মোট ঋণের পরিমাণ
+            {language === 'bn'
+              ? 'বাজারের চলমান মোট ঋণের পরিমাণ'
+              : 'Total active lending capital in market'}
           </span>
         </Card>
       </div>
@@ -265,13 +279,15 @@ export const ReportsPage: React.FC = () => {
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-bold flex items-center gap-2">
               <PieChart className="w-4 h-4 text-emerald-600" />
-              <span>পোর্টফোলিও অবস্থা বিভাজন</span>
+              <span>{language === 'bn' ? 'পোর্টফোলিও অবস্থা বিভাজন' : 'Portfolio Status Breakdown'}</span>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="space-y-2">
               <div className="flex justify-between text-xs font-bold">
-                <span className="text-emerald-700">চলমান বন্ধক ({activeMortgages.length})</span>
+                <span className="text-emerald-700">
+                  {language === 'bn' ? 'চলমান বন্ধক' : 'Active Mortgages'} ({activeMortgages.length})
+                </span>
                 <span className="font-mono text-slate-700">
                   {formatBDT(
                     activeMortgages.reduce((s, m) => s + m.principal, 0),
@@ -291,7 +307,9 @@ export const ReportsPage: React.FC = () => {
 
             <div className="space-y-2 pt-2">
               <div className="flex justify-between text-xs font-bold">
-                <span className="text-rose-700">মেয়াদোত্তীর্ণ বন্ধক ({overdueMortgages.length})</span>
+                <span className="text-rose-700">
+                  {language === 'bn' ? 'মেয়াদোত্তীর্ণ বন্ধক' : 'Overdue Mortgages'} ({overdueMortgages.length})
+                </span>
                 <span className="font-mono text-slate-700">
                   {formatBDT(
                     overdueMortgages.reduce((s, m) => s + m.principal, 0),
@@ -311,7 +329,9 @@ export const ReportsPage: React.FC = () => {
 
             <div className="space-y-2 pt-2">
               <div className="flex justify-between text-xs font-bold">
-                <span className="text-slate-600">পরিশোধিত ও সমাপ্ত ({closedMortgages.length})</span>
+                <span className="text-slate-600">
+                  {language === 'bn' ? 'পরিশোধিত ও সমাপ্ত' : 'Closed & Returned'} ({closedMortgages.length})
+                </span>
                 <span className="font-mono text-slate-700">
                   {formatBDT(
                     closedMortgages.reduce((s, m) => s + m.principal, 0),
@@ -336,7 +356,7 @@ export const ReportsPage: React.FC = () => {
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-bold flex items-center gap-2">
               <Coins className="w-4 h-4 text-emerald-600" />
-              <span>জামানতের ধরন অনুযায়ী বিভাজন</span>
+              <span>{language === 'bn' ? 'জামানতের ধরন অনুযায়ী বিভাজন' : 'Collateral Distribution'}</span>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">

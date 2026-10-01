@@ -19,7 +19,7 @@ export const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
   onClose,
   onEdit,
 }) => {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const navigate = useNavigate();
 
   if (!customer) return null;
@@ -49,7 +49,7 @@ export const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title={customer.name}
-      description="গ্রাহক বিবরণী ও প্রোফাইল"
+      description={language === 'en' ? 'Customer Profile & Details' : 'গ্রাহক বিবরণী ও প্রোফাইল'}
     >
       <div className="space-y-4">
         {/* Customer Header Info */}

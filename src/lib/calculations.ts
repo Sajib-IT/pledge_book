@@ -3,6 +3,21 @@
 
 import type { MortgageStatus } from '../types/database';
 
+export type InterestCalculationMode = 'full_year' | 'monthly' | 'daily' | 'custom';
+
+export interface EarlyRepaymentCalculation {
+  principal: number;
+  yearlyInterest: number;
+  mode: InterestCalculationMode;
+  daysElapsed: number;
+  monthsElapsed: number;
+  isEarly: boolean;
+  calculatedInterest: number;
+  discount: number;
+  netInterest: number;
+  total: number;
+}
+
 /**
  * Calculates yearly flat interest amount in BDT.
  * Rate is percentage (e.g. 25 for 25%).
@@ -23,7 +38,7 @@ export function calculateRenewAmount(principal: number, interestRate: number): n
 }
 
 /**
- * At the end of the 1-year term, customer CLOSES by paying principal + interest.
+ * Standard 1-year term mortgage closure (principal + full yearly interest).
  */
 export function calculateCloseAmount(
   principal: number,
@@ -34,6 +49,116 @@ export function calculateCloseAmount(
     principal,
     interest,
     total: principal + interest,
+  };
+}
+
+/**
+ * Calculates days and months elapsed between start date and payment date in Asia/Dhaka.
+ */
+export function calculateElapsedDuration(
+  startDateStr: string,
+  paymentDateStr?: string
+): { daysElapsed: number; monthsElapsed: number; isEarly: boolean } {
+  const payDate = paymentDateStr || getTodayDhakaDateString();
+  const start = new Date(startDateStr + 'T00:00:00+06:00');
+  const pay = new Date(payDate + 'T00:00:00+06:00');
+  const diffMs = pay.getTime() - start.getTime();
+  const daysElapsed = Math.max(1, Math.round(diffMs / (1000 * 60 * 60 * 24)));
+  // Months elapsed (ceil: 1-30 days = 1 month, 31-60 = 2 months, as customary in Bangladesh pawn shops)
+  const monthsElapsed = Math.max(1, Math.min(12, Math.ceil(daysElapsed / 30.4375)));
+  const isEarly = daysElapsed < 360;
+
+  return { daysElapsed, monthsElapsed, isEarly };
+}
+
+/**
+ * Computes early repayment settlement breakdown with pro-rata options and discount.
+ * Supports:
+ * - full_year: full 1-year flat interest (default contract)
+ * - monthly: pro-rated by elapsed months
+ * - daily: pro-rated by exact elapsed days
+ * - custom: owner negotiated custom interest
+ * - discount: deduction/waiver (e.g. 500, 1000 BDT)
+ */
+export function calculateEarlySettlement(
+  principal: number,
+  interestRate: number,
+  startDateStr: string,
+  paymentDateStr?: string,
+  mode: InterestCalculationMode = 'full_year',
+  discount: number = 0,
+  customInterestAmount?: number
+): EarlyRepaymentCalculation {
+  const yearlyInterest = calculateYearlyInterest(principal, interestRate);
+  const { daysElapsed, monthsElapsed, isEarly } = calculateElapsedDuration(
+    startDateStr,
+    paymentDateStr
+  );
+
+  let calculatedInterest = yearlyInterest;
+
+  if (mode === 'daily') {
+    const effectiveDays = Math.min(365, daysElapsed);
+    calculatedInterest = Math.round((yearlyInterest * effectiveDays) / 365);
+  } else if (mode === 'monthly') {
+    calculatedInterest = Math.round((yearlyInterest * monthsElapsed) / 12);
+  } else if (mode === 'custom') {
+    calculatedInterest = Math.max(0, Math.round(customInterestAmount || 0));
+  } else {
+    calculatedInterest = yearlyInterest;
+  }
+
+  const safeDiscount = Math.max(0, Math.round(discount || 0));
+  const effectiveDiscount = Math.min(calculatedInterest, safeDiscount);
+  const netInterest = Math.max(0, calculatedInterest - effectiveDiscount);
+  const total = principal + netInterest;
+
+  return {
+    principal,
+    yearlyInterest,
+    mode,
+    daysElapsed,
+    monthsElapsed,
+    isEarly,
+    calculatedInterest,
+    discount: effectiveDiscount,
+    netInterest,
+    total,
+  };
+}
+
+/**
+ * Computes renewal with discount / waiver / underpayment.
+ */
+export function calculateRenewWithDiscount(
+  principal: number,
+  interestRate: number,
+  discount: number = 0,
+  customInterestAmount?: number
+): {
+  yearlyInterest: number;
+  discount: number;
+  netInterest: number;
+} {
+  const yearlyInterest = calculateYearlyInterest(principal, interestRate);
+
+  if (customInterestAmount !== undefined && customInterestAmount !== null && customInterestAmount >= 0) {
+    const custom = Math.round(customInterestAmount);
+    return {
+      yearlyInterest,
+      discount: Math.max(0, yearlyInterest - custom),
+      netInterest: custom,
+    };
+  }
+
+  const safeDiscount = Math.max(0, Math.round(discount || 0));
+  const effectiveDiscount = Math.min(yearlyInterest, safeDiscount);
+  const netInterest = Math.max(0, yearlyInterest - effectiveDiscount);
+
+  return {
+    yearlyInterest,
+    discount: effectiveDiscount,
+    netInterest,
   };
 }
 
@@ -94,7 +219,6 @@ export function formatBDT(amount: number, locale: 'bn' | 'en' = 'bn'): string {
   const absAmount = Math.abs(Math.round(amount));
 
   // Indian/Bangladeshi numbering system format (lakh/crore):
-  // Last 3 digits grouped, then groups of 2 digits
   const str = absAmount.toString();
   let result = '';
   if (str.length > 3) {

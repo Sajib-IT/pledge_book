@@ -62,12 +62,38 @@ export const DueListPage: React.FC = () => {
     return true;
   });
 
+  const businessName =
+    localStorage.getItem('business_name') ||
+    import.meta.env.VITE_BUSINESS_NAME ||
+    'মেসার্স আলম ব্রাদার্স ট্রেডার্স ও বন্ধকী';
+
   const filterChips = [
-    { id: 'overdue', label: 'মেয়াদোত্তীর্ণ (Overdue)', count: activeMortgages.filter((m) => isMortgageOverdue(m.due_date, m.status)).length, alert: true },
-    { id: '7days', label: '৭ দিনের মধ্যে', count: activeMortgages.filter((m) => !isMortgageOverdue(m.due_date, m.status) && getDaysUntilDue(m.due_date) <= 7).length },
-    { id: '15days', label: '১৫ দিনের মধ্যে', count: activeMortgages.filter((m) => !isMortgageOverdue(m.due_date, m.status) && getDaysUntilDue(m.due_date) <= 15).length },
-    { id: '30days', label: '৩০ দিনের মধ্যে', count: activeMortgages.filter((m) => !isMortgageOverdue(m.due_date, m.status) && getDaysUntilDue(m.due_date) <= 30).length },
-    { id: 'all', label: 'সকল চলমান', count: activeMortgages.length },
+    {
+      id: 'overdue',
+      label: t('due_list.filter_overdue'),
+      count: activeMortgages.filter((m) => isMortgageOverdue(m.due_date, m.status)).length,
+      alert: true,
+    },
+    {
+      id: '7days',
+      label: t('due_list.filter_7_days'),
+      count: activeMortgages.filter((m) => !isMortgageOverdue(m.due_date, m.status) && getDaysUntilDue(m.due_date) <= 7).length,
+    },
+    {
+      id: '15days',
+      label: t('due_list.filter_15_days'),
+      count: activeMortgages.filter((m) => !isMortgageOverdue(m.due_date, m.status) && getDaysUntilDue(m.due_date) <= 15).length,
+    },
+    {
+      id: '30days',
+      label: t('due_list.filter_30_days'),
+      count: activeMortgages.filter((m) => !isMortgageOverdue(m.due_date, m.status) && getDaysUntilDue(m.due_date) <= 30).length,
+    },
+    {
+      id: 'all',
+      label: t('due_list.filter_all'),
+      count: activeMortgages.length,
+    },
   ];
 
   const handleFilterChange = (id: string) => {
@@ -99,13 +125,21 @@ export const DueListPage: React.FC = () => {
       : '880' + cleanPhone;
 
     const yearlyInterest = calculateYearlyInterest(principal, rate);
-    const formattedDue = formatDateDhaka(dueDate, 'bn');
+    const formattedDue = formatDateDhaka(dueDate, language);
 
     let text = '';
-    if (isOverdue) {
-      text = `আসসালামু আলাইকুম ${customerName} ভাই/আপা, মেসার্স আলম ব্রাদার্স ট্রেডার্স থেকে যোগাযোগ করা হচ্ছে। আপনার বন্ধকী (${mortgageNo}) এর মেয়াদ (${formattedDue}) উত্তীর্ণ হয়ে গেছে। দ্রুত যোগাযোগ করে বার্ষিক সুদ ${formatBDT(yearlyInterest, 'bn')} প্রদান করে নবায়ন করার জন্য বিনীত অনুরোধ জানাচ্ছি।`;
+    if (language === 'en') {
+      if (isOverdue) {
+        text = `Hello ${customerName}, this is ${businessName}. Your mortgage (${mortgageNo}) was due on ${formattedDue}. Please contact us promptly to renew by paying interest of ${formatBDT(yearlyInterest, 'en')} or settle in full.`;
+      } else {
+        text = `Hello ${customerName}, this is ${businessName}. This is a gentle reminder that your mortgage (${mortgageNo}) is due on ${formattedDue}. Please contact us to renew or settle.`;
+      }
     } else {
-      text = `আসসালামু আলাইকুম ${customerName} ভাই/আপা, মেসার্স আলম ব্রাদার্স ট্রেডার্স থেকে জানানো যাচ্ছে যে, আপনার বন্ধকী (${mortgageNo}) এর মেয়াদ আগামী ${formattedDue} তারিখে পূর্ণ হবে। সময়মতো সুদ প্রদান করে নবায়ন অথবা সম্পূর্ণ পরিশোধ করার অনুরোধ করা হলো।`;
+      if (isOverdue) {
+        text = `আসসালামু আলাইকুম ${customerName} ভাই/আপা, ${businessName} থেকে যোগাযোগ করা হচ্ছে। আপনার বন্ধকী (${mortgageNo}) এর মেয়াদ (${formattedDue}) উত্তীর্ণ হয়ে গেছে। দ্রুত যোগাযোগ করে বার্ষিক সুদ ${formatBDT(yearlyInterest, 'bn')} প্রদান করে নবায়ন করার জন্য বিনীত অনুরোধ জানাচ্ছি।`;
+      } else {
+        text = `আসসালামু আলাইকুম ${customerName} ভাই/আপা, ${businessName} থেকে জানানো যাচ্ছে যে, আপনার বন্ধকী (${mortgageNo}) এর মেয়াদ আগামী ${formattedDue} তারিখে পূর্ণ হবে। সময়মতো সুদ প্রদান করে নবায়ন অথবা সম্পূর্ণ পরিশোধ করার অনুরোধ করা হলো।`;
+      }
     }
 
     window.open(`https://wa.me/${intlPhone}?text=${encodeURIComponent(text)}`);
@@ -119,7 +153,9 @@ export const DueListPage: React.FC = () => {
           {t('due_list.title')}
         </h1>
         <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-          মেয়াদোত্তীর্ণ ও প্রদেয় বন্ধকী ঋণের তাগাদা এবং যোগাযোগের তালিকা
+          {language === 'en'
+            ? 'Track upcoming and overdue mortgage loans with 1-click reminders'
+            : 'মেয়াদোত্তীর্ণ ও প্রদেয় বন্ধকী ঋণের তাগাদা এবং যোগাযোগের তালিকা'}
         </p>
       </div>
 
@@ -130,7 +166,11 @@ export const DueListPage: React.FC = () => {
           <Input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="গ্রাহকের নাম, মোবাইল নম্বর বা বন্ধক নং দিয়ে খুঁজুন..."
+            placeholder={
+              language === 'en'
+                ? 'Search by customer name, phone, or mortgage no...'
+                : 'গ্রাহকের নাম, মোবাইল নম্বর বা বন্ধক নং দিয়ে খুঁজুন...'
+            }
             className="pl-10 h-11 bg-white shadow-2xs"
           />
         </div>

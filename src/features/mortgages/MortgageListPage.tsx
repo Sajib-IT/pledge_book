@@ -10,7 +10,7 @@ import { PlusCircle, Search, FileText } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export const MortgageListPage: React.FC = () => {
-  const { t } = useI18n();
+  const { language, t } = useI18n();
   const [activeTab, setActiveTab] = useState<'all' | 'active' | 'overdue' | 'closed'>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -20,10 +20,10 @@ export const MortgageListPage: React.FC = () => {
   });
 
   const tabs = [
-    { id: 'all', label: 'সকল' },
-    { id: 'active', label: 'চলমান (Active)' },
-    { id: 'overdue', label: 'মেয়াদোত্তীর্ণ (Overdue)' },
-    { id: 'closed', label: 'পরিশোধিত (Closed)' },
+    { id: 'all', label: language === 'bn' ? 'সকল' : 'All' },
+    { id: 'active', label: language === 'bn' ? 'চলমান (Active)' : 'Active' },
+    { id: 'overdue', label: language === 'bn' ? 'মেয়াদোত্তীর্ণ (Overdue)' : 'Overdue' },
+    { id: 'closed', label: language === 'bn' ? 'পরিশোধিত (Closed)' : 'Closed' },
   ];
 
   return (
@@ -35,7 +35,9 @@ export const MortgageListPage: React.FC = () => {
             {t('mortgages.title')}
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            সকল চলমান, পরিশোধিত ও তামাদি বন্ধকীর তালিকা
+            {language === 'bn'
+              ? 'সকল চলমান, পরিশোধিত ও তামাদি বন্ধকীর তালিকা'
+              : 'Directory of all active, overdue, and closed mortgages'}
           </p>
         </div>
 
@@ -54,7 +56,11 @@ export const MortgageListPage: React.FC = () => {
           <Input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="বন্ধক নং, গ্রাহকের নাম, ফোন বা জামানতের বিবরণ দিয়ে খুঁজুন..."
+            placeholder={
+              language === 'bn'
+                ? 'বন্ধক নং, গ্রাহকের নাম, ফোন বা জামানতের বিবরণ দিয়ে খুঁজুন...'
+                : 'Search by mortgage no, customer name, phone, or collateral...'
+            }
             className="pl-10 h-11 bg-white shadow-2xs"
           />
         </div>
@@ -92,11 +98,23 @@ export const MortgageListPage: React.FC = () => {
       ) : mortgages.length === 0 ? (
         <EmptyState
           icon={FileText}
-          title={searchQuery ? 'কোনো বন্ধকী পাওয়া যায়নি' : 'তালিকায় কোনো বন্ধক নেই'}
+          title={
+            searchQuery
+              ? language === 'bn'
+                ? 'কোনো বন্ধকী পাওয়া যায়নি'
+                : 'No mortgages found'
+              : language === 'bn'
+              ? 'তালিকায় কোনো বন্ধক নেই'
+              : 'No mortgages in list'
+          }
           description={
             searchQuery
-              ? `"${searchQuery}" এর সাথে মিলে এমন কোনো রেকর্ড নেই`
-              : 'নতুন জামানত গ্রহণ ও বন্ধক তৈরি করতে নিচের বাটনে চাপ দিন'
+              ? language === 'bn'
+                ? `"${searchQuery}" এর সাথে মিলে এমন কোনো রেকর্ড নেই`
+                : `No records matching "${searchQuery}"`
+              : language === 'bn'
+              ? 'নতুন জামানত গ্রহণ ও বন্ধক তৈরি করতে নিচের বাটনে চাপ দিন'
+              : 'Click the button below to issue a new mortgage'
           }
           actionLabel={t('mortgages.new_mortgage')}
           onAction={() => (window.location.href = '/mortgages/new')}

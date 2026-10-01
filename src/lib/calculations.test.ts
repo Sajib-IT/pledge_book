@@ -1,11 +1,14 @@
 // src/lib/calculations.test.ts
-// Unit tests for financial calculations and business rules
+// Unit tests for financial calculations, early repayments, discounts and business rules
 
 import { describe, it, expect } from 'vitest';
 import {
   calculateYearlyInterest,
   calculateRenewAmount,
   calculateCloseAmount,
+  calculateElapsedDuration,
+  calculateEarlySettlement,
+  calculateRenewWithDiscount,
   isMortgageOverdue,
   getDaysUntilDue,
   formatBDT,
@@ -42,6 +45,66 @@ describe('Mortgage Financial Calculations', () => {
   it('handles negative or zero principal gracefully', () => {
     expect(calculateYearlyInterest(0, 25)).toBe(0);
     expect(calculateYearlyInterest(-5000, 25)).toBe(0);
+  });
+});
+
+describe('Early Repayment & Elapsed Duration', () => {
+  it('calculates elapsed days and months correctly for early repayment', () => {
+    // 90 days = 3 months
+    const { daysElapsed, monthsElapsed, isEarly } = calculateElapsedDuration('2026-01-01', '2026-04-01');
+    expect(daysElapsed).toBe(90);
+    expect(monthsElapsed).toBe(3);
+    expect(isEarly).toBe(true);
+  });
+
+  it('computes pro-rata monthly early settlement: 40,000 principal at 25% after 3 months', () => {
+    // Yearly interest is 10,000. 3 months = 10,000 * 3 / 12 = 2,500
+    const res = calculateEarlySettlement(40000, 25, '2026-01-01', '2026-04-01', 'monthly');
+    expect(res.yearlyInterest).toBe(10000);
+    expect(res.calculatedInterest).toBe(2500);
+    expect(res.total).toBe(42500);
+    expect(res.isEarly).toBe(true);
+  });
+
+  it('computes pro-rata daily early settlement', () => {
+    // 90 days = 10,000 * 90 / 365 = 2466
+    const res = calculateEarlySettlement(40000, 25, '2026-01-01', '2026-04-01', 'daily');
+    expect(res.calculatedInterest).toBe(2466);
+    expect(res.total).toBe(42466);
+  });
+
+  it('applies discounts (e.g. 500 or 1,000 taka discount) correctly on early close', () => {
+    // Monthly interest: 2500, Discount: 500 => Net interest: 2000, Total: 42000
+    const with500 = calculateEarlySettlement(40000, 25, '2026-01-01', '2026-04-01', 'monthly', 500);
+    expect(with500.discount).toBe(500);
+    expect(with500.netInterest).toBe(2000);
+    expect(with500.total).toBe(42000);
+
+    // Full year: 10,000 interest, Discount: 1,000 => Net interest: 9,000, Total: 49,000
+    const with1000 = calculateEarlySettlement(40000, 25, '2026-01-01', '2027-01-01', 'full_year', 1000);
+    expect(with1000.discount).toBe(1000);
+    expect(with1000.netInterest).toBe(9000);
+    expect(with1000.total).toBe(49000);
+  });
+
+  it('supports custom agreed interest amount', () => {
+    const custom = calculateEarlySettlement(40000, 25, '2026-01-01', '2026-04-01', 'custom', 0, 1500);
+    expect(custom.calculatedInterest).toBe(1500);
+    expect(custom.netInterest).toBe(1500);
+    expect(custom.total).toBe(41500);
+  });
+
+  it('calculates renew interest with discount or underpayment', () => {
+    // 10,000 interest with 500 discount = 9,500 net
+    const res500 = calculateRenewWithDiscount(40000, 25, 500);
+    expect(res500.yearlyInterest).toBe(10000);
+    expect(res500.discount).toBe(500);
+    expect(res500.netInterest).toBe(9500);
+
+    // Custom agreed underpayment: 8,000
+    const custom = calculateRenewWithDiscount(40000, 25, 0, 8000);
+    expect(custom.netInterest).toBe(8000);
+    expect(custom.discount).toBe(2000);
   });
 });
 

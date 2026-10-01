@@ -2,7 +2,7 @@ import React from 'react';
 import { cn } from '../../lib/utils';
 
 export interface BadgeProps extends React.HTMLAttributes<HTMLDivElement> {
-  variant?: 'active' | 'closed' | 'overdue' | 'defaulted' | 'secondary' | 'outline' | 'interest' | 'full';
+  variant?: 'active' | 'closed' | 'overdue' | 'defaulted' | 'secondary' | 'outline' | 'interest' | 'full' | 'reversal';
 }
 
 export const Badge: React.FC<BadgeProps> = ({ className, variant = 'secondary', ...props }) => {
@@ -15,6 +15,7 @@ export const Badge: React.FC<BadgeProps> = ({ className, variant = 'secondary', 
     outline: 'border border-slate-300 text-slate-700 bg-transparent',
     interest: 'bg-blue-50 text-blue-700 border-blue-200',
     full: 'bg-purple-50 text-purple-700 border-purple-200',
+    reversal: 'bg-rose-50 text-rose-700 border-rose-200',
   };
 
   return (

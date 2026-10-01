@@ -341,17 +341,22 @@ export const useRenewMortgage = () => {
       mortgageId,
       paidOn,
       note,
+      amount,
     }: {
       mortgageId: string;
       paidOn: string;
       note?: string;
+      amount?: number;
     }) => {
       if (isMockMode || !isSupabaseConfigured) {
         const mtgIndex = mockMortgagesStore.findIndex((m) => m.id === mortgageId);
         if (mtgIndex === -1) throw new Error('Mortgage not found');
 
         const mtg = mockMortgagesStore[mtgIndex];
-        const interestAmount = calculateYearlyInterest(mtg.principal, mtg.interest_rate);
+        const interestAmount =
+          amount !== undefined && amount > 0
+            ? Math.round(amount)
+            : calculateYearlyInterest(mtg.principal, mtg.interest_rate);
 
         // Advance due_date by 1 year
         const currentDue = new Date(mtg.due_date);
@@ -389,6 +394,7 @@ export const useRenewMortgage = () => {
         p_mortgage_id: mortgageId,
         p_paid_on: paidOn,
         p_note: note || null,
+        p_amount: amount ? Math.round(amount) : null,
       });
 
       if (error) throw error;
@@ -411,18 +417,23 @@ export const useCloseMortgage = () => {
       mortgageId,
       paidOn,
       note,
+      amount,
     }: {
       mortgageId: string;
       paidOn: string;
       note?: string;
+      amount?: number;
     }) => {
       if (isMockMode || !isSupabaseConfigured) {
         const mtgIndex = mockMortgagesStore.findIndex((m) => m.id === mortgageId);
         if (mtgIndex === -1) throw new Error('Mortgage not found');
 
         const mtg = mockMortgagesStore[mtgIndex];
-        const interestAmount = calculateYearlyInterest(mtg.principal, mtg.interest_rate);
-        const totalAmount = mtg.principal + interestAmount;
+        const defaultInterest = calculateYearlyInterest(mtg.principal, mtg.interest_rate);
+        const totalAmount =
+          amount !== undefined && amount > 0
+            ? Math.round(amount)
+            : mtg.principal + defaultInterest;
 
         const yearMonth = new Date().toISOString().slice(0, 7).replace('-', '');
         const receipt_no = `REC-${yearMonth}-${receiptCounter++}`;
@@ -454,7 +465,7 @@ export const useCloseMortgage = () => {
           success: true,
           receipt_no,
           principal: mtg.principal,
-          interest: interestAmount,
+          interest: totalAmount - mtg.principal,
           total_amount: totalAmount,
           closed_at: now,
         };
@@ -465,6 +476,7 @@ export const useCloseMortgage = () => {
         p_mortgage_id: mortgageId,
         p_paid_on: paidOn,
         p_note: note || null,
+        p_amount: amount ? Math.round(amount) : null,
       });
 
       if (error) throw error;

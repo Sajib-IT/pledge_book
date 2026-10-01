@@ -77,7 +77,7 @@ export const MortgageCard: React.FC<{ mortgage: Mortgage }> = ({ mortgage }) => 
       <div className="py-3 flex items-start justify-between gap-3">
         <div>
           <h3 className="font-bold text-base text-slate-900 group-hover:text-emerald-700 transition-colors">
-            {mortgage.customer?.name || 'গ্রাহকের তথ্য'}
+            {mortgage.customer?.name || (language === 'bn' ? 'গ্রাহকের তথ্য' : 'Customer Info')}
           </h3>
           <p className="text-xs text-slate-500 font-medium mt-0.5">
             {mortgage.customer?.phone}
@@ -85,13 +85,15 @@ export const MortgageCard: React.FC<{ mortgage: Mortgage }> = ({ mortgage }) => 
         </div>
 
         <div className="text-right">
-          <span className="text-xs text-slate-400 font-medium block">আসল মূলধন</span>
+          <span className="text-xs text-slate-400 font-medium block">
+            {language === 'bn' ? 'আসল মূলধন' : 'Principal'}
+          </span>
           <div className="text-lg font-black text-slate-900 font-mono flex items-center justify-end gap-1">
             <Coins className="w-4 h-4 text-emerald-600" />
             <span>{formatBDT(mortgage.principal, language)}</span>
           </div>
           <span className="text-[11px] text-emerald-700 font-semibold block">
-            +{formatBDT(yearlyInterest, language)} সুদ ({mortgage.interest_rate}%)
+            +{formatBDT(yearlyInterest, language)} {language === 'bn' ? 'সুদ' : 'interest'} ({mortgage.interest_rate}%)
           </span>
         </div>
       </div>
@@ -105,7 +107,7 @@ export const MortgageCard: React.FC<{ mortgage: Mortgage }> = ({ mortgage }) => 
       <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
         <div className="flex items-center gap-1.5">
           <Calendar className="w-3.5 h-3.5 text-slate-400" />
-          <span>মেয়াদ: <strong className="text-slate-800">{formatDateDhaka(mortgage.due_date, language)}</strong></span>
+          <span>{language === 'bn' ? 'মেয়াদ:' : 'Due:'} <strong className="text-slate-800">{formatDateDhaka(mortgage.due_date, language)}</strong></span>
           {mortgage.status === 'active' && (
             <span
               className={`font-bold ml-1 ${
@@ -116,7 +118,9 @@ export const MortgageCard: React.FC<{ mortgage: Mortgage }> = ({ mortgage }) => 
                   : 'text-emerald-600'
               }`}
             >
-              ({isOverdue ? `${Math.abs(daysUntilDue)} দিন বিলম্বিত` : `${daysUntilDue} দিন বাকি`})
+              ({isOverdue
+                ? (language === 'bn' ? `${Math.abs(daysUntilDue)} দিন বিলম্বিত` : `${Math.abs(daysUntilDue)}d overdue`)
+                : (language === 'bn' ? `${daysUntilDue} দিন বাকি` : `${daysUntilDue}d remaining`)})
             </span>
           )}
         </div>

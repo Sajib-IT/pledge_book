@@ -30,7 +30,7 @@ export const CustomerList: React.FC = () => {
   const { data: customers = [], isLoading, isError, error, refetch } = useCustomers(searchQuery);
   const deleteMutation = useDeleteCustomer();
   const { isOwner } = useAuth();
-  const { t } = useI18n();
+  const { language, t } = useI18n();
 
   const handleEdit = (customer: Customer, e?: React.MouseEvent) => {
     e?.stopPropagation();
@@ -40,11 +40,19 @@ export const CustomerList: React.FC = () => {
 
   const handleDelete = async (customer: Customer, e?: React.MouseEvent) => {
     e?.stopPropagation();
-    if (window.confirm(`আপনি কি নিশ্চিতভাবে "${customer.name}" কে মুছে ফেলতে চান?`)) {
+    const confirmMsg =
+      language === 'bn'
+        ? `আপনি কি নিশ্চিতভাবে "${customer.name}" কে মুছে ফেলতে চান?`
+        : `Are you sure you want to delete customer "${customer.name}"?`;
+    if (window.confirm(confirmMsg)) {
       try {
         await deleteMutation.mutateAsync(customer.id);
-      } catch (err) {
-        alert('গ্রাহক মোছা সম্ভব হয়নি। তার সক্রিয় বন্ধক বা লেনদেন থাকতে পারে।');
+      } catch {
+        alert(
+          language === 'bn'
+            ? 'গ্রাহক মোছা সম্ভব হয়নি। তার সক্রিয় বন্ধক বা লেনদেন থাকতে পারে।'
+            : 'Could not delete customer. They may have active mortgages or transaction history.'
+        );
       }
     }
   };
@@ -63,7 +71,9 @@ export const CustomerList: React.FC = () => {
             {t('customers.title')}
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            মোট নিবন্ধিত গ্রাহক: <span className="font-bold text-emerald-700">{customers.length}</span> জন
+            {language === 'bn' ? 'মোট নিবন্ধিত গ্রাহক:' : 'Total Registered Customers:'}{' '}
+            <span className="font-bold text-emerald-700">{customers.length}</span>{' '}
+            {language === 'bn' ? 'জন' : ''}
           </p>
         </div>
         <Button
@@ -82,7 +92,11 @@ export const CustomerList: React.FC = () => {
         <Input
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="নাম, মোবাইল নম্বর বা NID দিয়ে খুঁজুন..."
+          placeholder={
+            language === 'bn'
+              ? 'নাম, মোবাইল নম্বর বা NID দিয়ে খুঁজুন...'
+              : 'Search by name, phone number, or NID...'
+          }
           className="pl-10 h-11 bg-white shadow-2xs"
         />
       </div>
@@ -102,11 +116,21 @@ export const CustomerList: React.FC = () => {
       ) : customers.length === 0 ? (
         <EmptyState
           icon={User}
-          title={searchQuery ? 'কোনো ফলাফল পাওয়া যায়নি' : t('customers.no_customers')}
+          title={
+            searchQuery
+              ? language === 'bn'
+                ? 'কোনো ফলাফল পাওয়া যায়নি'
+                : 'No results found'
+              : t('customers.no_customers')
+          }
           description={
             searchQuery
-              ? `"${searchQuery}" এর সাথে মিলে এমন কোনো গ্রাহক নেই`
-              : 'নতুন বন্ধক প্রদান করতে প্রথমে গ্রাহক তৈরি করুন'
+              ? language === 'bn'
+                ? `"${searchQuery}" এর সাথে মিলে এমন কোনো গ্রাহক নেই`
+                : `No customer matches "${searchQuery}"`
+              : language === 'bn'
+              ? 'নতুন বন্ধক প্রদান করতে প্রথমে গ্রাহক তৈরি করুন'
+              : 'Add a customer first to create mortgages'
           }
           actionLabel={t('customers.add_customer')}
           onAction={handleOpenAdd}
