@@ -29,7 +29,14 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
 
   if (!payment || !mortgage) return null;
 
-  const businessName = import.meta.env.VITE_BUSINESS_NAME || 'মেসার্স আলম ব্রাদার্স ট্রেডার্স ও বন্ধকী';
+  const businessName =
+    localStorage.getItem('business_name') ||
+    import.meta.env.VITE_BUSINESS_NAME ||
+    'মেসার্স আলম ব্রাদার্স ট্রেডার্স ও বন্ধকী';
+  const businessAddress =
+    localStorage.getItem('business_address') || 'উত্তরা, ঢাকা';
+  const businessPhone =
+    localStorage.getItem('business_phone') || '০১৭১১০০০০০১';
 
   const paymentTypeTitle =
     payment.type === 'interest'
@@ -116,7 +123,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
               বিশ্বস্ততার সাথে স্বর্ণ ও বন্ধকী ব্যবসা
             </p>
             <p className="text-[10px] text-slate-400 mt-0.5">
-              উত্তরা, ঢাকা • মোবাইল: ০১৭১১০০০০০১
+              {businessAddress} • মোবাইল: {businessPhone}
             </p>
             <div className="mt-2 inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-200">
               <ShieldCheck className="w-3 h-3" />

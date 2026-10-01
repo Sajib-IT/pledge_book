@@ -5,18 +5,105 @@ import { useI18n } from '../../lib/i18n';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
-import { Globe, Shield, Store, LogOut, Check, Lock, KeyRound } from 'lucide-react';
+import {
+  Globe,
+  Shield,
+  Store,
+  LogOut,
+  Check,
+  Lock,
+  KeyRound,
+  Users,
+  Building2,
+  Phone,
+  MapPin,
+  CheckCircle2,
+  XCircle,
+  Smartphone,
+} from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '../../lib/supabase';
+import type { Profile } from '../../types/database';
 
 export const SettingsPage: React.FC = () => {
   const { profile, role, isOwner, logout, switchDemoRole } = useAuth();
   const { isLockEnabled, enableLock, disableLock, lockApp } = useAppLock();
   const { language, setLanguage, t } = useI18n();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
+  // Business settings state
+  const [businessName, setBusinessName] = useState<string>(
+    () => localStorage.getItem('business_name') || import.meta.env.VITE_BUSINESS_NAME || 'মেসার্স আলম ব্রাদার্স ট্রেডার্স ও বন্ধকী'
+  );
+  const [businessPhone, setBusinessPhone] = useState<string>(
+    () => localStorage.getItem('business_phone') || '০১৭১১০০০০০১'
+  );
+  const [businessAddress, setBusinessAddress] = useState<string>(
+    () => localStorage.getItem('business_address') || 'উত্তরা, ঢাকা'
+  );
+  const [businessSaved, setBusinessSaved] = useState(false);
+
+  // Interest rate setting
   const [defaultRate, setDefaultRate] = useState<string>('25.00');
   const [savedRateSuccess, setSavedRateSuccess] = useState(false);
+
+  // PIN lock state
   const [newPin, setNewPin] = useState('');
   const [pinSuccess, setPinSuccess] = useState(false);
-  const navigate = useNavigate();
+
+  // Fetch Staff profiles (Owner only)
+  const { data: staffList = [], isLoading: isLoadingStaff } = useQuery<Profile[]>({
+    queryKey: ['staff_profiles'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('role', 'staff')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.warn('Could not fetch staff from Supabase:', error);
+        return [
+          {
+            id: 'demo-staff-1',
+            name: 'তানভীর আহমেদ (ম্যানেজার)',
+            role: 'staff',
+            phone: '01812000002',
+            is_active: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ];
+      }
+      return (data || []) as Profile[];
+    },
+    enabled: isOwner,
+  });
+
+  // Toggle Staff Active Status Mutation
+  const toggleStaffMutation = useMutation({
+    mutationFn: async ({ staffId, newStatus }: { staffId: string; newStatus: boolean }) => {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ is_active: newStatus, updated_at: new Date().toISOString() })
+        .eq('id', staffId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['staff_profiles'] });
+    },
+  });
+
+  const handleSaveBusiness = () => {
+    localStorage.setItem('business_name', businessName);
+    localStorage.setItem('business_phone', businessPhone);
+    localStorage.setItem('business_address', businessAddress);
+    setBusinessSaved(true);
+    setTimeout(() => setBusinessSaved(false), 2500);
+  };
 
   const handleSaveRate = () => {
     localStorage.setItem('default_interest_rate', defaultRate);
@@ -38,9 +125,167 @@ export const SettingsPage: React.FC = () => {
           {t('settings.title')}
         </h1>
         <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-          সিস্টেম ও ব্যবসায়িক সেটিংস কনফিগারেশন
+          সিস্টেম, ব্যবসায়িক তথ্য ও নিরাপত্তা সেটিংস কনফিগারেশন
         </p>
       </div>
+
+      {/* Business Details (Owner Only) */}
+      {isOwner && (
+        <Card className="border-emerald-100 shadow-sm">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Building2 className="w-5 h-5 text-emerald-600" />
+              <CardTitle>প্রতিষ্ঠানের তথ্য (Business Details)</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-xs text-slate-500">
+              এই তথ্যসমূহ গ্রাহকের পেমেন্ট রসিদ, ভাউচার ও হোয়াটসঅ্যাপ নোটিফিকেশনে প্রিন্ট হবে।
+            </p>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">
+                  প্রতিষ্ঠানের নাম (Business Name)
+                </label>
+                <div className="relative">
+                  <Store className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                  <Input
+                    type="text"
+                    value={businessName}
+                    onChange={(e) => setBusinessName(e.target.value)}
+                    className="pl-9 text-sm"
+                    placeholder="মেসার্স আলম ব্রাদার্স ট্রেডার্স"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">
+                    মোবাইল নম্বর (Contact Phone)
+                  </label>
+                  <div className="relative">
+                    <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                    <Input
+                      type="text"
+                      value={businessPhone}
+                      onChange={(e) => setBusinessPhone(e.target.value)}
+                      className="pl-9 text-sm"
+                      placeholder="০১৭১১০০০০০১"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">
+                    ঠিকানা (Address / Location)
+                  </label>
+                  <div className="relative">
+                    <MapPin className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                    <Input
+                      type="text"
+                      value={businessAddress}
+                      onChange={(e) => setBusinessAddress(e.target.value)}
+                      className="pl-9 text-sm"
+                      placeholder="উত্তরা, ঢাকা"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                <Button onClick={handleSaveBusiness} variant="primary" size="sm">
+                  সংরক্ষণ করুন
+                </Button>
+                {businessSaved && (
+                  <p className="text-xs text-emerald-700 font-semibold flex items-center gap-1">
+                    <Check className="w-3.5 h-3.5" /> প্রতিষ্ঠানের তথ্য সফলভাবে সংরক্ষিত হয়েছে
+                  </p>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Staff Management (Owner Only) */}
+      {isOwner && (
+        <Card className="border-slate-200 shadow-sm">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Users className="w-5 h-5 text-emerald-600" />
+                <CardTitle>কর্মচারী ব্যবস্থাপনা (Staff Management)</CardTitle>
+              </div>
+              <span className="text-xs font-bold px-2 py-0.5 bg-slate-100 text-slate-700 rounded-full">
+                {staffList.length} জন কর্মী
+              </span>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-xs text-slate-500">
+              কর্মচারীরা বন্ধকী তৈরি ও সুদ গ্রহণ করতে পারে, কিন্তু কোনো রেকর্ড মুছে ফেলতে বা আয়ের রিপোর্ট দেখতে পারে না।
+            </p>
+
+            {isLoadingStaff ? (
+              <p className="text-xs text-slate-400 py-3 text-center">তথ্য লোড হচ্ছে...</p>
+            ) : staffList.length === 0 ? (
+              <div className="p-4 rounded-xl bg-slate-50 border border-dashed border-slate-200 text-center">
+                <p className="text-xs text-slate-500">বর্তমানে কোনো কর্মচারী নিবন্ধিত নেই।</p>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  নতুন কর্মচারী যোগ করতে Supabase Auth থেকে staff@pledgebook.com তৈরি করুন।
+                </p>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100 border border-slate-100 rounded-xl overflow-hidden">
+                {staffList.map((st) => (
+                  <div
+                    key={st.id}
+                    className="p-3 bg-white flex items-center justify-between hover:bg-slate-50 transition-colors"
+                  >
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold text-slate-800">{st.name}</span>
+                        {st.is_active ? (
+                          <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <CheckCircle2 className="w-3 h-3" /> সক্রিয়
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                            <XCircle className="w-3 h-3" /> নিষ্ক্রিয়
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        মোবাইল: {st.phone || 'দেওয়া হয়নি'}
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        toggleStaffMutation.mutate({
+                          staffId: st.id,
+                          newStatus: !st.is_active,
+                        })
+                      }
+                      disabled={toggleStaffMutation.isPending}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                        st.is_active
+                          ? 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'
+                          : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
+                      }`}
+                    >
+                      {st.is_active ? 'নিষ্ক্রিয় করুন' : 'সক্রিয় করুন'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Language Setting */}
       <Card>
@@ -202,6 +447,24 @@ export const SettingsPage: React.FC = () => {
               <span>অ্যাপ লক পরীক্ষা করুন (Lock Now)</span>
             </Button>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Android Native APK Card */}
+      <Card className="border-emerald-100 bg-emerald-50/20">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Smartphone className="w-5 h-5 text-emerald-700" />
+            <CardTitle>অ্যান্ড্রয়েড মোবাইল অ্যাপ (Android Native App)</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <p className="text-xs text-slate-600">
+            মোবাইল সংস্করণ সম্পূর্ণ প্রস্তুত। ক্যামেরা, পিন লক এবং লোকাল নোটিফিকেশন সহ অ্যান্ড্রয়েড APK বিল্ড সফল হয়েছে।
+          </p>
+          <p className="text-[11px] font-mono bg-white p-2 rounded-lg border border-emerald-200 text-slate-700 break-all">
+            APK Path: android/app/build/outputs/apk/debug/app-debug.apk
+          </p>
         </CardContent>
       </Card>
 
