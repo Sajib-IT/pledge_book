@@ -3,6 +3,8 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { I18nProvider } from './lib/i18n';
 import { AuthProvider } from './features/auth/AuthContext';
+import { AppLockProvider } from './features/auth/AppLockContext';
+import { PinLockOverlay } from './features/auth/PinLockOverlay';
 import { ProtectedRoute } from './features/auth/ProtectedRoute';
 import { LoginForm } from './features/auth/LoginForm';
 import { Header } from './components/common/Header';
@@ -45,8 +47,10 @@ export const App: React.FC = () => {
     <QueryClientProvider client={queryClient}>
       <I18nProvider>
         <AuthProvider>
-          <BrowserRouter>
-            <Routes>
+          <AppLockProvider>
+            <PinLockOverlay />
+            <BrowserRouter>
+              <Routes>
               {/* Public Login Route */}
               <Route path="/login" element={<LoginForm />} />
 
@@ -146,6 +150,7 @@ export const App: React.FC = () => {
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </BrowserRouter>
+          </AppLockProvider>
         </AuthProvider>
       </I18nProvider>
     </QueryClientProvider>
