@@ -34,8 +34,8 @@ export const LoginForm: React.FC = () => {
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: 'owner@pledgebook.bd',
-      password: 'password123',
+      email: 'ashiksajib19@gmail.com',
+      password: '123456',
     },
   });
 
@@ -51,10 +51,10 @@ export const LoginForm: React.FC = () => {
 
   const handleQuickFill = (role: 'owner' | 'staff') => {
     if (role === 'owner') {
-      setValue('email', 'owner@pledgebook.bd');
-      setValue('password', 'password123');
+      setValue('email', 'ashiksajib19@gmail.com');
+      setValue('password', '123456');
     } else {
-      setValue('email', 'staff@pledgebook.bd');
+      setValue('email', 'staff@pledgebook.com');
       setValue('password', 'password123');
     }
   };
@@ -92,7 +92,7 @@ export const LoginForm: React.FC = () => {
               <Input
                 label={t('auth.email_or_phone')}
                 type="text"
-                placeholder="owner@pledgebook.bd"
+                placeholder="owner@pledgebook.com"
                 {...register('email')}
                 error={errors.email?.message}
               />
