@@ -24,6 +24,7 @@ export const BottomNav: React.FC = () => {
             <NavLink
               key={item.to}
               to={item.to}
+              end={item.to === '/'}
               className={({ isActive }) =>
                 cn(
                   'flex flex-col items-center justify-center w-full h-full py-1 text-xs font-medium transition-colors select-none',

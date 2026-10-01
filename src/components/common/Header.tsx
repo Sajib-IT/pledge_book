@@ -2,7 +2,7 @@ import React from 'react';
 import { useAuth } from '../../features/auth/AuthContext';
 import { useI18n } from '../../lib/i18n';
 import { Globe, LogOut, Shield } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useNavigate } from 'react-router-dom';
 
 export const Header: React.FC = () => {
   const { user, profile, logout } = useAuth();
@@ -19,6 +19,13 @@ export const Header: React.FC = () => {
       navigate('/login');
     }
   };
+
+  const getNavLinkClass = ({ isActive }: { isActive: boolean }) =>
+    `px-3.5 py-1.5 rounded-xl text-sm transition-all ${
+      isActive
+        ? 'bg-emerald-600 text-white font-bold shadow-xs'
+        : 'text-slate-600 font-medium hover:text-emerald-700 hover:bg-emerald-50/70'
+    }`;
 
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/80 safe-top">
@@ -39,51 +46,52 @@ export const Header: React.FC = () => {
         </Link>
 
         {/* Desktop Navigation Links */}
-        <nav className="hidden md:flex items-center gap-1 font-medium text-sm text-slate-600">
-          <Link
+        <nav className="hidden md:flex items-center gap-1.5 font-medium text-sm text-slate-600">
+          <NavLink
             to="/"
-            className="px-3 py-2 rounded-lg hover:text-emerald-700 hover:bg-emerald-50/60 transition-colors"
+            end
+            className={getNavLinkClass}
           >
             {t('nav.dashboard')}
-          </Link>
-          <Link
+          </NavLink>
+          <NavLink
             to="/customers"
-            className="px-3 py-2 rounded-lg hover:text-emerald-700 hover:bg-emerald-50/60 transition-colors"
+            className={getNavLinkClass}
           >
             {t('nav.customers')}
-          </Link>
-          <Link
+          </NavLink>
+          <NavLink
             to="/mortgages"
-            className="px-3 py-2 rounded-lg hover:text-emerald-700 hover:bg-emerald-50/60 transition-colors"
+            className={getNavLinkClass}
           >
             {t('nav.mortgages')}
-          </Link>
-          <Link
+          </NavLink>
+          <NavLink
             to="/due-list"
-            className="px-3 py-2 rounded-lg hover:text-emerald-700 hover:bg-emerald-50/60 transition-colors"
+            className={getNavLinkClass}
           >
             {t('nav.due_list')}
-          </Link>
-          <Link
+          </NavLink>
+          <NavLink
             to="/receipts"
-            className="px-3 py-2 rounded-lg hover:text-emerald-700 hover:bg-emerald-50/60 transition-colors"
+            className={getNavLinkClass}
           >
             {t('nav.receipts')}
-          </Link>
+          </NavLink>
           {profile?.role === 'owner' && (
-            <Link
+            <NavLink
               to="/reports"
-              className="px-3 py-2 rounded-lg hover:text-emerald-700 hover:bg-emerald-50/60 transition-colors"
+              className={getNavLinkClass}
             >
               {t('nav.reports')}
-            </Link>
+            </NavLink>
           )}
-          <Link
+          <NavLink
             to="/settings"
-            className="px-3 py-2 rounded-lg hover:text-emerald-700 hover:bg-emerald-50/60 transition-colors"
+            className={getNavLinkClass}
           >
             {t('nav.settings')}
-          </Link>
+          </NavLink>
         </nav>
 
         {/* Right Action Icons: Language Toggle & User Profile */}
