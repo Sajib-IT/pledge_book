@@ -91,8 +91,10 @@ export const NewMortgagePage: React.FC = () => {
   }, [preselectedCustomerId, setValue]);
 
   // Watch values for real-time calculation preview
-  const watchedPrincipal = watch('principal') || 0;
-  const watchedRate = watch('interest_rate') || 0;
+  const rawPrincipal = watch('principal');
+  const rawRate = watch('interest_rate');
+  const watchedPrincipal = Number(rawPrincipal) || 0;
+  const watchedRate = Number(rawRate) || 0;
   const watchedStartDate = watch('start_date');
 
   // Automatically sync due_date to +1 year when start_date changes
@@ -259,7 +261,7 @@ export const NewMortgagePage: React.FC = () => {
                 type="number"
                 step="500"
                 placeholder="40000"
-                {...register('principal')}
+                {...register('principal', { valueAsNumber: true })}
                 error={errors.principal?.message}
                 helperText={t('mortgages.principal_helper')}
               />
@@ -269,7 +271,7 @@ export const NewMortgagePage: React.FC = () => {
                 type="number"
                 step="0.5"
                 placeholder="25.00"
-                {...register('interest_rate')}
+                {...register('interest_rate', { valueAsNumber: true })}
                 error={errors.interest_rate?.message}
                 helperText={t('mortgages.interest_helper')}
               />

@@ -42,6 +42,22 @@ describe('Mortgage Financial Calculations', () => {
     expect(close.total).toBe(50000);
   });
 
+  it('prevents string concatenation bug for total settlement (20,000 + 5,000 = 25,000 not 200005000)', () => {
+    // Tests 20,000 BDT at 25% interest rate
+    const resNum = calculateCloseAmount(20000, 25);
+    expect(resNum.principal).toBe(20000);
+    expect(resNum.interest).toBe(5000);
+    expect(resNum.total).toBe(25000);
+    expect(formatBDT(resNum.total, 'en')).toBe('৳ 25,000');
+
+    // Also tests string input from HTML form inputs
+    const resStr = calculateCloseAmount('20000' as any, '25' as any);
+    expect(resStr.principal).toBe(20000);
+    expect(resStr.interest).toBe(5000);
+    expect(resStr.total).toBe(25000);
+    expect(formatBDT(resStr.total, 'en')).toBe('৳ 25,000');
+  });
+
   it('handles negative or zero principal gracefully', () => {
     expect(calculateYearlyInterest(0, 25)).toBe(0);
     expect(calculateYearlyInterest(-5000, 25)).toBe(0);

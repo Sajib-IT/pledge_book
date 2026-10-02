@@ -25,8 +25,10 @@ export interface EarlyRepaymentCalculation {
  * All monetary amounts are integers (no floating cents).
  */
 export function calculateYearlyInterest(principal: number, interestRate: number): number {
-  if (principal <= 0 || interestRate < 0) return 0;
-  return Math.round((principal * interestRate) / 100);
+  const numPrincipal = Number(principal) || 0;
+  const numRate = Number(interestRate) || 0;
+  if (numPrincipal <= 0 || numRate < 0) return 0;
+  return Math.round((numPrincipal * numRate) / 100);
 }
 
 /**
@@ -34,7 +36,7 @@ export function calculateYearlyInterest(principal: number, interestRate: number)
  * Principal remains unchanged, due_date is extended by 1 year.
  */
 export function calculateRenewAmount(principal: number, interestRate: number): number {
-  return calculateYearlyInterest(principal, interestRate);
+  return calculateYearlyInterest(Number(principal) || 0, Number(interestRate) || 0);
 }
 
 /**
@@ -44,11 +46,13 @@ export function calculateCloseAmount(
   principal: number,
   interestRate: number
 ): { principal: number; interest: number; total: number } {
-  const interest = calculateYearlyInterest(principal, interestRate);
+  const numPrincipal = Number(principal) || 0;
+  const numRate = Number(interestRate) || 0;
+  const interest = calculateYearlyInterest(numPrincipal, numRate);
   return {
-    principal,
+    principal: numPrincipal,
     interest,
-    total: principal + interest,
+    total: numPrincipal + interest,
   };
 }
 
@@ -89,7 +93,9 @@ export function calculateEarlySettlement(
   discount: number = 0,
   customInterestAmount?: number
 ): EarlyRepaymentCalculation {
-  const yearlyInterest = calculateYearlyInterest(principal, interestRate);
+  const numPrincipal = Number(principal) || 0;
+  const numRate = Number(interestRate) || 0;
+  const yearlyInterest = calculateYearlyInterest(numPrincipal, numRate);
   const { daysElapsed, monthsElapsed, isEarly } = calculateElapsedDuration(
     startDateStr,
     paymentDateStr
@@ -103,18 +109,18 @@ export function calculateEarlySettlement(
   } else if (mode === 'monthly') {
     calculatedInterest = Math.round((yearlyInterest * monthsElapsed) / 12);
   } else if (mode === 'custom') {
-    calculatedInterest = Math.max(0, Math.round(customInterestAmount || 0));
+    calculatedInterest = Math.max(0, Math.round(Number(customInterestAmount) || 0));
   } else {
     calculatedInterest = yearlyInterest;
   }
 
-  const safeDiscount = Math.max(0, Math.round(discount || 0));
+  const safeDiscount = Math.max(0, Math.round(Number(discount) || 0));
   const effectiveDiscount = Math.min(calculatedInterest, safeDiscount);
   const netInterest = Math.max(0, calculatedInterest - effectiveDiscount);
-  const total = principal + netInterest;
+  const total = numPrincipal + netInterest;
 
   return {
-    principal,
+    principal: numPrincipal,
     yearlyInterest,
     mode,
     daysElapsed,
@@ -140,10 +146,12 @@ export function calculateRenewWithDiscount(
   discount: number;
   netInterest: number;
 } {
-  const yearlyInterest = calculateYearlyInterest(principal, interestRate);
+  const numPrincipal = Number(principal) || 0;
+  const numRate = Number(interestRate) || 0;
+  const yearlyInterest = calculateYearlyInterest(numPrincipal, numRate);
 
-  if (customInterestAmount !== undefined && customInterestAmount !== null && customInterestAmount >= 0) {
-    const custom = Math.round(customInterestAmount);
+  if (customInterestAmount !== undefined && customInterestAmount !== null) {
+    const custom = Math.max(0, Math.round(Number(customInterestAmount)));
     return {
       yearlyInterest,
       discount: Math.max(0, yearlyInterest - custom),
@@ -151,7 +159,7 @@ export function calculateRenewWithDiscount(
     };
   }
 
-  const safeDiscount = Math.max(0, Math.round(discount || 0));
+  const safeDiscount = Math.max(0, Math.round(Number(discount) || 0));
   const effectiveDiscount = Math.min(yearlyInterest, safeDiscount);
   const netInterest = Math.max(0, yearlyInterest - effectiveDiscount);
 
@@ -214,9 +222,10 @@ export function toBanglaDigits(val: string | number): string {
  * Formats an integer amount into BDT (Taka) format.
  * E.g., 40000 -> ৳ ৪০,০০০ (bn) or ৳ 40,000 (en)
  */
-export function formatBDT(amount: number, locale: 'bn' | 'en' = 'bn'): string {
-  const isNegative = amount < 0;
-  const absAmount = Math.abs(Math.round(amount));
+export function formatBDT(amount: number | string, locale: 'bn' | 'en' = 'bn'): string {
+  const num = typeof amount === 'number' ? (isNaN(amount) ? 0 : amount) : (Number(amount) || 0);
+  const isNegative = num < 0;
+  const absAmount = Math.abs(Math.round(num));
 
   // Indian/Bangladeshi numbering system format (lakh/crore):
   const str = absAmount.toString();
