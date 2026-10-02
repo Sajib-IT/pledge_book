@@ -26,9 +26,10 @@ import {
   Coins,
   ChevronRight,
 } from 'lucide-react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 export const DueListPage: React.FC = () => {
+  const navigate = useNavigate();
   const { language, t } = useI18n();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialFilter = searchParams.get('filter') || 'overdue';
@@ -241,7 +242,8 @@ export const DueListPage: React.FC = () => {
             return (
               <Card
                 key={mtg.id}
-                className={`p-4 sm:p-5 transition-all hover:shadow-md border ${
+                onClick={() => navigate(`/mortgages/${mtg.id}`)}
+                className={`p-4 sm:p-5 transition-all hover:shadow-md cursor-pointer border hover:border-emerald-300 group ${
                   isOverdue
                     ? 'border-rose-200 bg-gradient-to-r from-rose-50/40 via-white to-white'
                     : 'border-slate-200 bg-white'
@@ -267,12 +269,12 @@ export const DueListPage: React.FC = () => {
                       )}
                     </div>
 
-                    <Link to={`/mortgages/${mtg.id}`} className="group block pt-1">
+                    <div className="pt-1">
                       <h3 className="text-base font-bold text-slate-900 group-hover:text-emerald-700 transition-colors flex items-center gap-1.5">
                         <span>{mtg.customer?.name}</span>
-                        <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
+                        <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-emerald-600 group-hover:translate-x-0.5 transition-transform" />
                       </h3>
-                    </Link>
+                    </div>
 
                     <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 pt-0.5">
                       <span className="flex items-center gap-1 font-semibold text-slate-700">
