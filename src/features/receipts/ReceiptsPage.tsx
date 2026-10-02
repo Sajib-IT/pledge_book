@@ -77,7 +77,9 @@ export const ReceiptsPage: React.FC = () => {
           {t('receipts.title')}
         </h1>
         <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-          সকল সংগৃহীত কিস্তি, সুদ ও নিষ্পত্তির অফিশিয়াল ডিজিটাল রসিদ
+          {language === 'bn'
+            ? 'সকল সংগৃহীত কিস্তি, সুদ ও নিষ্পত্তির অফিশিয়াল ডিজিটাল রসিদ'
+            : 'Official digital payment receipts for all installments, interest & settlements'}
         </p>
       </div>
 
@@ -86,7 +88,11 @@ export const ReceiptsPage: React.FC = () => {
         <Input
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="রসিদ নং, বন্ধক নং বা গ্রাহকের নাম দিয়ে খুঁজুন..."
+          placeholder={
+            language === 'bn'
+              ? 'রসিদ নং, বন্ধক নং বা গ্রাহকের নাম দিয়ে খুঁজুন...'
+              : 'Search by receipt no, mortgage no, or customer name...'
+          }
           className="pl-10 h-11 bg-white shadow-2xs"
         />
       </div>
@@ -105,8 +111,12 @@ export const ReceiptsPage: React.FC = () => {
       ) : filteredReceipts.length === 0 ? (
         <EmptyState
           icon={FileText}
-          title="কোনো রসিদ পাওয়া যায়নি"
-          description="কোনো কিস্তি বা পরিশোধের পর এখানে রসিদ সংরক্ষিত হবে।"
+          title={language === 'bn' ? 'কোনো রসিদ পাওয়া যায়নি' : 'No Receipts Found'}
+          description={
+            language === 'bn'
+              ? 'কোনো কিস্তি বা পরিশোধের পর এখানে রসিদ সংরক্ষিত হবে।'
+              : 'Receipts will appear here after any installment or loan settlement.'
+          }
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -144,12 +154,14 @@ export const ReceiptsPage: React.FC = () => {
                     {mortgage?.customer?.name}
                   </h3>
                   <p className="text-xs text-slate-500 font-mono">
-                    বন্ধক: {mortgage?.mortgage_no} • {mortgage?.customer?.phone}
+                    {language === 'bn' ? 'বন্ধক:' : 'Mortgage:'} {mortgage?.mortgage_no} • {mortgage?.customer?.phone}
                   </p>
                 </div>
 
                 <div className="text-right">
-                  <span className="text-xs text-slate-400 font-medium block">আদায়কৃত টাকা</span>
+                  <span className="text-xs text-slate-400 font-medium block">
+                    {language === 'bn' ? 'আদায়কৃত টাকা' : 'Amount Received'}
+                  </span>
                   <div className="text-lg font-black text-emerald-700 font-mono">
                     {formatBDT(payment.amount, language)}
                   </div>
@@ -166,7 +178,7 @@ export const ReceiptsPage: React.FC = () => {
                   onClick={(e) => e.stopPropagation()}
                   className="text-slate-500 hover:text-emerald-700 font-medium flex items-center gap-1"
                 >
-                  <span>বন্ধক বিবরণী</span>
+                  <span>{language === 'bn' ? 'বন্ধক বিবরণী' : 'Mortgage Details'}</span>
                   <ArrowUpRight className="w-3.5 h-3.5" />
                 </Link>
 
@@ -177,7 +189,7 @@ export const ReceiptsPage: React.FC = () => {
                   onClick={() => setSelectedReceipt({ payment, mortgage })}
                 >
                   <Printer className="w-3.5 h-3.5" />
-                  <span>রসিদ দেখুন / শেয়ার</span>
+                  <span>{language === 'bn' ? 'রসিদ দেখুন / শেয়ার' : 'View / Share Receipt'}</span>
                 </Button>
               </div>
             </Card>

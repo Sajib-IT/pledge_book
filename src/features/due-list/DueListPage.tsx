@@ -8,6 +8,7 @@ import {
   getDaysUntilDue,
   isMortgageOverdue,
   calculateYearlyInterest,
+  toBanglaDigits,
 } from '../../lib/calculations';
 import { Card } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
@@ -225,9 +226,9 @@ export const DueListPage: React.FC = () => {
       ) : filteredMortgages.length === 0 ? (
         <EmptyState
           icon={AlertTriangle}
-          title="কোনো বন্ধকী তাগাদার প্রয়োজন নেই"
-          description="নির্বাচিত ফিল্টারের আওতায় বর্তমানে কোনো মেয়াদোত্তীর্ণ বা প্রদেয় বন্ধকী নেই।"
-          actionLabel="সকল বন্ধক দেখুন"
+          title={language === 'bn' ? "কোনো বন্ধকী তাগাদার প্রয়োজন নেই" : "No Due or Overdue Mortgages"}
+          description={language === 'bn' ? "নির্বাচিত ফিল্টারের আওতায় বর্তমানে কোনো মেয়াদোত্তীর্ণ বা প্রদেয় বন্ধকী নেই।" : "There are currently no overdue or upcoming due mortgages under this filter."}
+          actionLabel={language === 'bn' ? "সকল বন্ধক দেখুন" : "View All Mortgages"}
           onAction={() => handleFilterChange('all')}
         />
       ) : (
@@ -256,12 +257,12 @@ export const DueListPage: React.FC = () => {
                       {isOverdue ? (
                         <Badge variant="overdue" className="gap-1 text-[11px] font-bold">
                           <AlertTriangle className="w-3.5 h-3.5" />
-                          <span>{Math.abs(daysUntilDue)} দিন মেয়াদোত্তীর্ণ</span>
+                          <span>{language === 'bn' ? `${toBanglaDigits(Math.abs(daysUntilDue))} দিন মেয়াদোত্তীর্ণ` : `${Math.abs(daysUntilDue)}d overdue`}</span>
                         </Badge>
                       ) : (
                         <Badge variant="secondary" className="gap-1 text-[11px] text-amber-700 bg-amber-50 border-amber-200 font-bold">
                           <Clock className="w-3.5 h-3.5" />
-                          <span>{daysUntilDue} দিন বাকি</span>
+                          <span>{language === 'bn' ? `${toBanglaDigits(daysUntilDue)} দিন বাকি` : `${daysUntilDue}d remaining`}</span>
                         </Badge>
                       )}
                     </div>
@@ -280,25 +281,27 @@ export const DueListPage: React.FC = () => {
                       </span>
                       <span className="flex items-center gap-1">
                         <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                        মেয়াদ: <strong className="text-slate-700">{formatDateDhaka(mtg.due_date, language)}</strong>
+                        <span>{language === 'bn' ? 'মেয়াদ:' : 'Due:'} <strong className="text-slate-700">{formatDateDhaka(mtg.due_date, language)}</strong></span>
                       </span>
                     </div>
 
                     <p className="text-xs text-slate-500 line-clamp-1 italic pt-1">
-                      জামানত: {mtg.collateral_description}
+                      {language === 'bn' ? 'জামানত:' : 'Collateral:'} {mtg.collateral_description}
                     </p>
                   </div>
 
                   {/* Financials & Quick Action Buttons */}
                   <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-100 gap-3">
                     <div className="text-left sm:text-right">
-                      <div className="text-xs text-slate-400">প্রদেয় সুদ</div>
+                      <div className="text-xs text-slate-400">
+                        {language === 'bn' ? 'প্রদেয় সুদ' : 'Interest Due'}
+                      </div>
                       <div className="text-lg font-black text-emerald-700 font-mono flex items-center sm:justify-end gap-1">
                         <Coins className="w-4 h-4 text-emerald-600" />
                         <span>{formatBDT(yearlyInterest, language)}</span>
                       </div>
                       <span className="text-[11px] text-slate-500 font-medium">
-                        আসল: {formatBDT(mtg.principal, language)}
+                        {language === 'bn' ? 'আসল:' : 'Principal:'} {formatBDT(mtg.principal, language)}
                       </span>
                     </div>
 

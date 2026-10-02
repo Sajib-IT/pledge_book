@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { useI18n } from '../../lib/i18n';
-import { formatBDT } from '../../lib/calculations';
+import { formatBDT, toBanglaDigits } from '../../lib/calculations';
 import { useDashboardStats } from './useDashboardStats';
 import { useMortgages } from '../mortgages/useMortgages';
 import { MortgageCard } from '../mortgages/MortgageCard';
@@ -55,7 +55,9 @@ export const DashboardView: React.FC = () => {
             {t('app_name')}
           </h1>
           <p className="text-emerald-100 text-xs sm:text-sm mt-1 max-w-md">
-            বন্ধকী ঋণ, স্বর্ণের হিসাব ও সুদের সম্পূর্ণ ডিজিটাল খাতা
+            {language === 'bn'
+              ? 'বন্ধকী ঋণ, স্বর্ণের হিসাব ও সুদের সম্পূর্ণ ডিজিটাল খাতা'
+              : 'Complete digital ledger for mortgage loans, collateral & interest tracking'}
           </p>
         </div>
 
@@ -99,7 +101,9 @@ export const DashboardView: React.FC = () => {
             {formatBDT(activeStats.total_outstanding_principal, language)}
           </div>
           <span className="text-[11px] text-slate-500 font-medium mt-1 block">
-            {activeStats.active_mortgages_count} টি সক্রিয় বন্ধক
+            {language === 'bn'
+              ? `${toBanglaDigits(activeStats.active_mortgages_count)} টি সক্রিয় বন্ধক`
+              : `${activeStats.active_mortgages_count} active ${activeStats.active_mortgages_count === 1 ? 'mortgage' : 'mortgages'}`}
           </span>
         </Card>
 
@@ -117,7 +121,7 @@ export const DashboardView: React.FC = () => {
             {formatBDT(activeStats.expected_interest_this_month, language)}
           </div>
           <span className="text-[11px] text-blue-600 font-medium mt-1 block">
-            চলতি মাসে প্রদেয়
+            {language === 'bn' ? 'চলতি মাসে প্রদেয়' : 'Receivable this month'}
           </span>
         </Card>
 
@@ -133,10 +137,10 @@ export const DashboardView: React.FC = () => {
               </div>
             </div>
             <div className="text-xl sm:text-2xl font-black text-rose-800 mt-2 font-mono">
-              {activeStats.overdue_count} টি
+              {language === 'bn' ? `${toBanglaDigits(activeStats.overdue_count)} টি` : activeStats.overdue_count}
             </div>
             <span className="text-[11px] text-rose-600 font-semibold mt-1 block">
-              তাগাদা প্রদান আবশ্যক
+              {language === 'bn' ? 'তাগাদা প্রদান আবশ্যক' : 'Urgent follow-up required'}
             </span>
           </Card>
         </Link>
@@ -153,10 +157,10 @@ export const DashboardView: React.FC = () => {
               </div>
             </div>
             <div className="text-xl sm:text-2xl font-black text-amber-900 mt-2 font-mono">
-              {activeStats.due_within_15_days_count} টি
+              {language === 'bn' ? `${toBanglaDigits(activeStats.due_within_15_days_count)} টি` : activeStats.due_within_15_days_count}
             </div>
             <span className="text-[11px] text-amber-600 font-medium mt-1 block">
-              মেয়াদ আসন্ন
+              {language === 'bn' ? 'মেয়াদ আসন্ন' : 'Due date approaching'}
             </span>
           </Card>
         </Link>
@@ -174,7 +178,9 @@ export const DashboardView: React.FC = () => {
               {formatBDT(activeStats.income_this_month, language)}
             </div>
             <span className="text-[11px] text-slate-500 font-medium mt-1 block">
-              সকল সুদ ও পরিশোধিত বন্ধক থেকে আয়
+              {language === 'bn'
+                ? 'সকল সুদ ও পরিশোধিত বন্ধক থেকে আয়'
+                : 'From all interest & settled mortgages'}
             </span>
           </Card>
           <Card className="p-5 border-slate-200 bg-white">
@@ -186,7 +192,9 @@ export const DashboardView: React.FC = () => {
               {formatBDT(activeStats.income_this_year, language)}
             </div>
             <span className="text-[11px] text-slate-500 font-medium mt-1 block">
-              চলতি অর্থবছরে সংগৃহীত মোট আয়
+              {language === 'bn'
+                ? 'চলতি অর্থবছরে সংগৃহীত মোট আয়'
+                : 'Total collected in current fiscal year'}
             </span>
           </Card>
         </div>
@@ -197,15 +205,17 @@ export const DashboardView: React.FC = () => {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-lg font-black text-slate-900 tracking-tight">
-              সাম্প্রতিক বন্ধকী হিসাব
+              {language === 'bn' ? 'সাম্প্রতিক বন্ধকী হিসাব' : 'Recent Mortgages'}
             </h2>
-            <p className="text-xs text-slate-500">চলমান ও সাম্প্রতিক লেনদেনসমূহ</p>
+            <p className="text-xs text-slate-500">
+              {language === 'bn' ? 'চলমান ও সাম্প্রতিক লেনদেনসমূহ' : 'Active and recent transactions'}
+            </p>
           </div>
           <Link
             to="/mortgages"
             className="text-xs font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1"
           >
-            <span>সবগুলো দেখুন</span>
+            <span>{language === 'bn' ? 'সবগুলো দেখুন' : 'View All'}</span>
             <ChevronRight className="w-4 h-4" />
           </Link>
         </div>

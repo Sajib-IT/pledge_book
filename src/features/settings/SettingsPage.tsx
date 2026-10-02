@@ -191,7 +191,9 @@ export const SettingsPage: React.FC = () => {
           {t('settings.title')}
         </h1>
         <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-          সিস্টেম, ব্যবসায়িক তথ্য ও নিরাপত্তা সেটিংস কনফিগারেশন
+          {language === 'bn'
+            ? 'সিস্টেম, ব্যবসায়িক তথ্য ও নিরাপত্তা সেটিংস কনফিগারেশন'
+            : 'System, business profile & security settings configuration'}
         </p>
       </div>
 
@@ -201,18 +203,22 @@ export const SettingsPage: React.FC = () => {
           <CardHeader>
             <div className="flex items-center gap-2">
               <Building2 className="w-5 h-5 text-emerald-600" />
-              <CardTitle>প্রতিষ্ঠানের তথ্য (Business Details)</CardTitle>
+              <CardTitle>
+                {language === 'bn' ? 'প্রতিষ্ঠানের তথ্য (Business Details)' : 'Business Profile'}
+              </CardTitle>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-xs text-slate-500">
-              এই তথ্যসমূহ গ্রাহকের পেমেন্ট রসিদ, ভাউচার ও হোয়াটসঅ্যাপ নোটিফিকেশনে প্রিন্ট হবে।
+              {language === 'bn'
+                ? 'এই তথ্যসমূহ গ্রাহকের পেমেন্ট রসিদ, ভাউচার ও হোয়াটসঅ্যাপ নোটিফিকেশনে প্রিন্ট হবে।'
+                : 'This info will appear on printed customer receipts, vouchers, and notifications.'}
             </p>
 
             <div className="space-y-3">
               <div>
                 <label className="text-xs font-bold text-slate-700 block mb-1">
-                  প্রতিষ্ঠানের নাম (Business Name)
+                  {language === 'bn' ? 'প্রতিষ্ঠানের নাম' : 'Business / Shop Name'}
                 </label>
                 <div className="relative">
                   <Store className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
@@ -221,7 +227,7 @@ export const SettingsPage: React.FC = () => {
                     value={businessName}
                     onChange={(e) => setBusinessName(e.target.value)}
                     className="pl-9 text-sm"
-                    placeholder="মেসার্স আলম ব্রাদার্স ট্রেডার্স"
+                    placeholder={language === 'bn' ? 'মেসার্স আলম ব্রাদার্স ট্রেডার্স' : 'e.g. M/S Alam Brothers'}
                   />
                 </div>
               </div>
@@ -229,7 +235,7 @@ export const SettingsPage: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">
-                    মোবাইল নম্বর (Contact Phone)
+                    {language === 'bn' ? 'মোবাইল নম্বর' : 'Contact Phone'}
                   </label>
                   <div className="relative">
                     <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
@@ -238,14 +244,14 @@ export const SettingsPage: React.FC = () => {
                       value={businessPhone}
                       onChange={(e) => setBusinessPhone(e.target.value)}
                       className="pl-9 text-sm"
-                      placeholder="০১৭১১০০০০০১"
+                      placeholder="01711000001"
                     />
                   </div>
                 </div>
 
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">
-                    ঠিকানা (Address / Location)
+                    {language === 'bn' ? 'ঠিকানা' : 'Address / Location'}
                   </label>
                   <div className="relative">
                     <MapPin className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
@@ -254,7 +260,7 @@ export const SettingsPage: React.FC = () => {
                       value={businessAddress}
                       onChange={(e) => setBusinessAddress(e.target.value)}
                       className="pl-9 text-sm"
-                      placeholder="উত্তরা, ঢাকা"
+                      placeholder={language === 'bn' ? 'উত্তরা, ঢাকা' : 'e.g. Uttara, Dhaka'}
                     />
                   </div>
                 </div>
@@ -262,11 +268,14 @@ export const SettingsPage: React.FC = () => {
 
               <div className="flex items-center justify-between pt-2">
                 <Button onClick={handleSaveBusiness} variant="primary" size="sm">
-                  সংরক্ষণ করুন
+                  {t('common.save')}
                 </Button>
                 {businessSaved && (
                   <p className="text-xs text-emerald-700 font-semibold flex items-center gap-1">
-                    <Check className="w-3.5 h-3.5" /> প্রতিষ্ঠানের তথ্য সফলভাবে সংরক্ষিত হয়েছে
+                    <Check className="w-3.5 h-3.5" />{' '}
+                    {language === 'bn'
+                      ? 'প্রতিষ্ঠানের তথ্য সফলভাবে সংরক্ষিত হয়েছে'
+                      : 'Business details saved successfully'}
                   </p>
                 )}
               </div>
@@ -282,25 +291,31 @@ export const SettingsPage: React.FC = () => {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Users className="w-5 h-5 text-emerald-600" />
-                <CardTitle>কর্মচারী ব্যবস্থাপনা (Staff Management)</CardTitle>
+                <CardTitle>{language === 'bn' ? 'কর্মচারী ব্যবস্থাপনা' : 'Staff Management'}</CardTitle>
               </div>
               <span className="text-xs font-bold px-2 py-0.5 bg-slate-100 text-slate-700 rounded-full">
-                {staffList.length} জন কর্মী
+                {staffList.length} {language === 'bn' ? 'জন কর্মী' : 'staff members'}
               </span>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-xs text-slate-500">
-              কর্মচারীরা বন্ধকী তৈরি ও সুদ গ্রহণ করতে পারে, কিন্তু কোনো রেকর্ড মুছে ফেলতে বা আয়ের রিপোর্ট দেখতে পারে না।
+              {language === 'bn'
+                ? 'কর্মচারীরা বন্ধকী তৈরি ও সুদ গ্রহণ করতে পারে, কিন্তু কোনো রেকর্ড মুছে ফেলতে বা আয়ের রিপোর্ট দেখতে পারে না।'
+                : 'Staff members can create mortgages and accept payments, but cannot delete records or view revenue reports.'}
             </p>
 
             {isLoadingStaff ? (
-              <p className="text-xs text-slate-400 py-3 text-center">তথ্য লোড হচ্ছে...</p>
+              <p className="text-xs text-slate-400 py-3 text-center">{t('common.loading')}</p>
             ) : staffList.length === 0 ? (
               <div className="p-4 rounded-xl bg-slate-50 border border-dashed border-slate-200 text-center">
-                <p className="text-xs text-slate-500">বর্তমানে কোনো কর্মচারী নিবন্ধিত নেই।</p>
+                <p className="text-xs text-slate-500">
+                  {language === 'bn' ? 'বর্তমানে কোনো কর্মচারী নিবন্ধিত নেই।' : 'No staff members currently registered.'}
+                </p>
                 <p className="text-[11px] text-slate-400 mt-1">
-                  নতুন কর্মচারী যোগ করতে Supabase Auth থেকে staff@pledgebook.com তৈরি করুন।
+                  {language === 'bn'
+                    ? 'নতুন কর্মচারী যোগ করতে রেজিস্ট্রেশন পেজ থেকে Staff রোল নির্বাচন করুন।'
+                    : 'To add new staff, register from the sign-up page with the Staff role.'}
                 </p>
               </div>
             ) : (
@@ -315,16 +330,16 @@ export const SettingsPage: React.FC = () => {
                         <span className="text-sm font-bold text-slate-800">{st.name}</span>
                         {st.is_active ? (
                           <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            <CheckCircle2 className="w-3 h-3" /> সক্রিয়
+                            <CheckCircle2 className="w-3 h-3" /> {language === 'bn' ? 'সক্রিয়' : 'Active'}
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
-                            <XCircle className="w-3 h-3" /> নিষ্ক্রিয়
+                            <XCircle className="w-3 h-3" /> {language === 'bn' ? 'নিষ্ক্রিয়' : 'Inactive'}
                           </span>
                         )}
                       </div>
                       <p className="text-xs text-slate-500 mt-0.5">
-                        মোবাইল: {st.phone || 'দেওয়া হয়নি'}
+                        {language === 'bn' ? 'মোবাইল:' : 'Phone:'} {st.phone || (language === 'bn' ? 'দেওয়া হয়নি' : 'Not provided')}
                       </p>
                     </div>
 
@@ -343,7 +358,7 @@ export const SettingsPage: React.FC = () => {
                           : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
                       }`}
                     >
-                      {st.is_active ? 'নিষ্ক্রিয় করুন' : 'সক্রিয় করুন'}
+                      {st.is_active ? (language === 'bn' ? 'নিষ্ক্রিয় করুন' : 'Deactivate') : (language === 'bn' ? 'সক্রিয় করুন' : 'Activate')}
                     </button>
                   </div>
                 ))}
@@ -417,7 +432,7 @@ export const SettingsPage: React.FC = () => {
             </div>
             {savedRateSuccess && (
               <p className="text-xs text-emerald-700 font-semibold flex items-center gap-1">
-                <Check className="w-3.5 h-3.5" /> ডিফল্ট হার সংরক্ষিত হয়েছে
+                <Check className="w-3.5 h-3.5" /> {language === 'bn' ? 'ডিফল্ট হার সংরক্ষিত হয়েছে' : 'Default interest rate saved'}
               </p>
             )}
           </CardContent>
@@ -439,7 +454,9 @@ export const SettingsPage: React.FC = () => {
 
           <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200">
             <span className="text-sm font-bold text-slate-800">
-              নিরাপত্তা লক {isLockEnabled ? 'চালু আছে' : 'বন্ধ আছে'}
+              {language === 'bn'
+                ? `নিরাপত্তা লক ${isLockEnabled ? 'চালু আছে' : 'বন্ধ আছে'}`
+                : `Security PIN Lock: ${isLockEnabled ? 'Enabled' : 'Disabled'}`}
             </span>
             <button
               type="button"
@@ -450,7 +467,7 @@ export const SettingsPage: React.FC = () => {
                   if (newPin.length === 4) {
                     await enableLock(newPin);
                   } else {
-                    alert('প্রথমে ৪ ডিজিটের একটি পিন নম্বর লিখুন');
+                    alert(language === 'bn' ? 'প্রথমে ৪ ডিজিটের একটি পিন নম্বর লিখুন' : 'Please enter a 4-digit PIN first');
                   }
                 }
               }}
@@ -460,20 +477,22 @@ export const SettingsPage: React.FC = () => {
                   : 'bg-emerald-600 text-white hover:bg-emerald-700'
               }`}
             >
-              {isLockEnabled ? 'বন্ধ করুন' : 'চালু করুন'}
+              {isLockEnabled
+                ? (language === 'bn' ? 'বন্ধ করুন' : 'Disable')
+                : (language === 'bn' ? 'চালু করুন' : 'Enable')}
             </button>
           </div>
 
           <div className="space-y-2 pt-1">
             <label className="text-xs font-semibold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
               <KeyRound className="w-3.5 h-3.5 text-emerald-600" />
-              <span>৪ ডিজিটের নতুন পিন সেট করুন</span>
+              <span>{language === 'bn' ? '৪ ডিজিটের নতুন পিন সেট করুন' : 'Set New 4-Digit PIN'}</span>
             </label>
             <div className="flex items-center gap-2">
               <Input
                 type="password"
                 maxLength={4}
-                placeholder="যেমন: ১২৩৪"
+                placeholder={language === 'bn' ? 'যেমন: ১২৩৪' : 'e.g. 1234'}
                 value={newPin}
                 onChange={(e) => setNewPin(e.target.value.replace(/[^0-9]/g, ''))}
                 className="font-mono text-center tracking-widest text-base"
@@ -487,7 +506,7 @@ export const SettingsPage: React.FC = () => {
                     setPinSuccess(true);
                     setTimeout(() => setPinSuccess(false), 2000);
                   } else {
-                    alert('সঠিক ৪ ডিজিটের পিন নম্বর দিন');
+                    alert(language === 'bn' ? 'সঠিক ৪ ডিজিটের পিন নম্বর দিন' : 'Please provide a valid 4-digit PIN');
                   }
                 }}
               >
@@ -496,7 +515,7 @@ export const SettingsPage: React.FC = () => {
             </div>
             {pinSuccess && (
               <p className="text-xs text-emerald-700 font-semibold flex items-center gap-1">
-                <Check className="w-3.5 h-3.5" /> পিন সফলভাবে সংরক্ষিত হয়েছে
+                <Check className="w-3.5 h-3.5" /> {language === 'bn' ? 'পিন সফলভাবে সংরক্ষিত হয়েছে' : 'PIN saved successfully'}
               </p>
             )}
           </div>
@@ -510,7 +529,7 @@ export const SettingsPage: React.FC = () => {
               className="w-full text-xs text-slate-700 border-slate-300 gap-1.5"
             >
               <Lock className="w-3.5 h-3.5" />
-              <span>অ্যাপ লক পরীক্ষা করুন (Lock Now)</span>
+              <span>{language === 'bn' ? 'অ্যাপ লক পরীক্ষা করুন (Lock Now)' : 'Test App Lock (Lock Now)'}</span>
             </Button>
           )}
         </CardContent>
@@ -616,12 +635,14 @@ export const SettingsPage: React.FC = () => {
         <CardHeader>
           <div className="flex items-center gap-2">
             <Smartphone className="w-5 h-5 text-emerald-700" />
-            <CardTitle>অ্যান্ড্রয়েড মোবাইল অ্যাপ (Android Native App)</CardTitle>
+            <CardTitle>{language === 'bn' ? 'অ্যান্ড্রয়েড মোবাইল অ্যাপ (Android Native App)' : 'Android Native Mobile App'}</CardTitle>
           </div>
         </CardHeader>
         <CardContent className="space-y-2">
           <p className="text-xs text-slate-600">
-            মোবাইল সংস্করণ সম্পূর্ণ প্রস্তুত। ক্যামেরা, পিন লক এবং লোকাল নোটিফিকেশন সহ অ্যান্ড্রয়েড APK বিল্ড সফল হয়েছে।
+            {language === 'bn'
+              ? 'মোবাইল সংস্করণ সম্পূর্ণ প্রস্তুত। ক্যামেরা, পিন লক এবং লোকাল নোটিফিকেশন সহ অ্যান্ড্রয়েড APK বিল্ড সফল হয়েছে।'
+              : 'Mobile app is ready. Android APK built with camera capture, PIN security lock, and scheduled notifications.'}
           </p>
           <p className="text-[11px] font-mono bg-white p-2 rounded-lg border border-emerald-200 text-slate-700 break-all">
             Release APK: app-release.apk

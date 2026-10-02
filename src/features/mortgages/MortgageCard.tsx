@@ -1,7 +1,7 @@
 import React from 'react';
 import type { Mortgage } from '../../types/database';
 import { useI18n } from '../../lib/i18n';
-import { formatBDT, formatDateDhaka, isMortgageOverdue, getDaysUntilDue, calculateYearlyInterest } from '../../lib/calculations';
+import { formatBDT, formatDateDhaka, isMortgageOverdue, getDaysUntilDue, calculateYearlyInterest, toBanglaDigits } from '../../lib/calculations';
 import { Card } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
 import {
@@ -93,7 +93,7 @@ export const MortgageCard: React.FC<{ mortgage: Mortgage }> = ({ mortgage }) => 
             <span>{formatBDT(mortgage.principal, language)}</span>
           </div>
           <span className="text-[11px] text-emerald-700 font-semibold block">
-            +{formatBDT(yearlyInterest, language)} {language === 'bn' ? 'সুদ' : 'interest'} ({mortgage.interest_rate}%)
+            +{formatBDT(yearlyInterest, language)} {language === 'bn' ? 'সুদ' : 'interest'} ({language === 'bn' ? toBanglaDigits(mortgage.interest_rate) : mortgage.interest_rate}%)
           </span>
         </div>
       </div>
@@ -119,8 +119,8 @@ export const MortgageCard: React.FC<{ mortgage: Mortgage }> = ({ mortgage }) => 
               }`}
             >
               ({isOverdue
-                ? (language === 'bn' ? `${Math.abs(daysUntilDue)} দিন বিলম্বিত` : `${Math.abs(daysUntilDue)}d overdue`)
-                : (language === 'bn' ? `${daysUntilDue} দিন বাকি` : `${daysUntilDue}d remaining`)})
+                ? (language === 'bn' ? `${toBanglaDigits(Math.abs(daysUntilDue))} দিন বিলম্বিত` : `${Math.abs(daysUntilDue)}d overdue`)
+                : (language === 'bn' ? `${toBanglaDigits(daysUntilDue)} দিন বাকি` : `${daysUntilDue}d remaining`)})
             </span>
           )}
         </div>
