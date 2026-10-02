@@ -47,7 +47,36 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
 
   // Print action
   const handlePrint = () => {
-    window.print();
+    if (!receiptRef.current) return;
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      window.print();
+      return;
+    }
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Receipt_${payment.receipt_no}</title>
+          <style>
+            @page { size: A5 portrait; margin: 8mm; }
+            body { margin: 0; padding: 0; font-family: Inter, system-ui, -apple-system, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; background: #fff; }
+            * { box-sizing: border-box; }
+          </style>
+        </head>
+        <body>
+          <div style="width: 100%; max-width: 460px;">
+            ${receiptRef.current.innerHTML}
+          </div>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 250);
   };
 
   // Download PDF action
@@ -57,8 +86,9 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
     try {
       const element = receiptRef.current;
       const canvas = await html2canvas(element, {
-        scale: 2,
+        scale: 2.5,
         useCORS: true,
+        allowTaint: true,
         backgroundColor: '#ffffff',
         logging: false,
       });
@@ -79,7 +109,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
       }
 
       const posX = (pageWidth - renderW) / 2;
-      const posY = margin + (maxH - renderH) / 2;
+      const posY = (pageHeight - renderH) / 2;
 
       const pdf = new jsPDF({
         orientation: 'portrait',
@@ -134,94 +164,257 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
         <div
           ref={receiptRef}
           id="printable-receipt"
-          className="p-5 rounded-2xl bg-white border border-emerald-800/20 shadow-sm text-slate-900 space-y-3.5 font-sans print:p-0 print:border-none"
+          style={{
+            fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
+            backgroundColor: '#ffffff',
+            color: '#0f172a',
+            border: '2px solid #059669',
+            borderRadius: '16px',
+            padding: '24px',
+            width: '100%',
+            maxWidth: '460px',
+            margin: '0 auto',
+            boxSizing: 'border-box',
+          }}
+          className="shadow-md space-y-4"
         >
           {/* Business Header */}
-          <div className="text-center pb-2.5 border-b-2 border-dashed border-slate-300">
-            <h2 className="text-lg font-black text-emerald-800 tracking-tight">
+          <div
+            style={{
+              textAlign: 'center',
+              paddingBottom: '14px',
+              borderBottom: '2px dashed #cbd5e1',
+            }}
+          >
+            <h2
+              style={{
+                fontSize: '20px',
+                fontWeight: '900',
+                color: '#065f46',
+                margin: 0,
+                letterSpacing: '-0.02em',
+              }}
+            >
               {businessName}
             </h2>
-            <p className="text-[11px] text-slate-500 font-medium">
+            <p
+              style={{
+                fontSize: '12px',
+                color: '#64748b',
+                fontWeight: '500',
+                margin: '3px 0 0 0',
+              }}
+            >
               {t('receipts.tagline')}
             </p>
-            <p className="text-[10px] text-slate-400 mt-0.5">
+            <p
+              style={{
+                fontSize: '11px',
+                color: '#94a3b8',
+                margin: '2px 0 0 0',
+              }}
+            >
               {businessAddress} • {t('common.phone')}: {businessPhone}
             </p>
-            <div className="mt-2 inline-block bg-emerald-50 text-emerald-800 text-[11px] font-bold px-3 py-0.5 rounded-full border border-emerald-300 tracking-wide">
+            <div
+              style={{
+                marginTop: '10px',
+                display: 'inline-block',
+                backgroundColor: '#ecfdf5',
+                color: '#065f46',
+                fontSize: '11px',
+                fontWeight: '700',
+                padding: '4px 14px',
+                borderRadius: '9999px',
+                border: '1px solid #6ee7b7',
+                letterSpacing: '0.05em',
+              }}
+            >
               ✓ {t('receipts.customer_copy')}
             </div>
           </div>
 
           {/* Receipt Meta */}
-          <div className="flex items-center justify-between text-xs pb-1">
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              fontSize: '12px',
+              paddingBottom: '4px',
+            }}
+          >
             <div>
-              <span className="text-slate-400 block text-[10px]">{t('payments.receipt_no')}</span>
-              <span className="font-mono font-bold text-slate-900 text-sm">
+              <span style={{ color: '#94a3b8', display: 'block', fontSize: '10px' }}>
+                {t('payments.receipt_no')}
+              </span>
+              <span style={{ fontFamily: 'monospace', fontWeight: '800', color: '#0f172a', fontSize: '14px' }}>
                 {payment.receipt_no}
               </span>
             </div>
-            <div className="text-right">
-              <span className="text-slate-400 block text-[10px]">{t('payments.paid_on')}</span>
-              <span className="font-semibold text-slate-800">
+            <div style={{ textAlign: 'right' }}>
+              <span style={{ color: '#94a3b8', display: 'block', fontSize: '10px' }}>
+                {t('payments.paid_on')}
+              </span>
+              <span style={{ fontWeight: '700', color: '#1e293b' }}>
                 {formatDateDhaka(payment.paid_on, language)}
               </span>
             </div>
           </div>
 
           {/* Customer & Mortgage Details */}
-          <div className="space-y-1.5 text-xs bg-slate-50 p-3 rounded-xl border border-slate-200/80">
-            <div className="flex justify-between items-center">
-              <span className="text-slate-500 font-medium">{t('customers.name')}:</span>
-              <span className="font-bold text-slate-800">{mortgage.customer?.name}</span>
+          <div
+            style={{
+              backgroundColor: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '12px',
+              padding: '12px 14px',
+              fontSize: '12px',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '2px 0' }}>
+              <span style={{ color: '#64748b', fontWeight: '500' }}>{t('customers.name')}:</span>
+              <span style={{ fontWeight: '800', color: '#0f172a' }}>{mortgage.customer?.name}</span>
             </div>
-            <div className="flex justify-between items-center">
-              <span className="text-slate-500 font-medium">{t('common.phone')}:</span>
-              <span className="font-mono font-semibold text-slate-700">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '2px 0' }}>
+              <span style={{ color: '#64748b', fontWeight: '500' }}>{t('common.phone')}:</span>
+              <span style={{ fontFamily: 'monospace', fontWeight: '700', color: '#334155' }}>
                 {mortgage.customer?.phone}
               </span>
             </div>
-            <div className="flex justify-between items-center">
-              <span className="text-slate-500 font-medium">{t('mortgages.mortgage_no')}:</span>
-              <span className="font-mono font-semibold text-slate-700">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '2px 0' }}>
+              <span style={{ color: '#64748b', fontWeight: '500' }}>{t('mortgages.mortgage_no')}:</span>
+              <span style={{ fontFamily: 'monospace', fontWeight: '700', color: '#334155' }}>
                 {mortgage.mortgage_no}
               </span>
             </div>
-            <div className="flex items-start justify-between gap-3 pt-1 border-t border-slate-200/60">
-              <span className="text-slate-500 font-medium shrink-0">{t('mortgages.collateral_type')}:</span>
-              <span className="text-slate-800 font-semibold italic text-right break-words max-w-[220px]">
-                {mortgage.collateral_description || t(`mortgages.collateral_types.${mortgage.collateral_type}`, mortgage.collateral_type)}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                justifyContent: 'space-between',
+                paddingTop: '6px',
+                marginTop: '4px',
+                borderTop: '1px solid #e2e8f0',
+                gap: '12px',
+              }}
+            >
+              <span style={{ color: '#64748b', fontWeight: '500', flexShrink: 0 }}>
+                {t('mortgages.collateral_type')}:
+              </span>
+              <span
+                style={{
+                  fontStyle: 'italic',
+                  fontWeight: '600',
+                  color: '#1e293b',
+                  textAlign: 'right',
+                  wordBreak: 'break-word',
+                  maxWidth: '240px',
+                }}
+              >
+                {mortgage.collateral_description ||
+                  t(`mortgages.collateral_types.${mortgage.collateral_type}`, mortgage.collateral_type)}
               </span>
             </div>
           </div>
 
           {/* Payment Type and Amount */}
-          <div className="p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-200 text-center">
-            <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider block">
+          <div
+            style={{
+              backgroundColor: '#ecfdf5',
+              border: '1.5px solid #a7f3d0',
+              borderRadius: '14px',
+              padding: '16px',
+              textAlign: 'center',
+            }}
+          >
+            <span
+              style={{
+                fontSize: '11px',
+                fontWeight: '800',
+                color: '#065f46',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                display: 'block',
+              }}
+            >
               {paymentTypeTitle}
             </span>
-            <div className="text-2xl font-black text-emerald-900 font-mono mt-1">
+            <div
+              style={{
+                fontSize: '28px',
+                fontWeight: '900',
+                color: '#064e3b',
+                fontFamily: 'monospace',
+                marginTop: '6px',
+              }}
+            >
               {formatBDT(payment.amount, language)}
             </div>
-            <p className="text-[11px] text-emerald-700 mt-1">
-              {language === 'bn' ? 'নগদে বুঝিয়া পাইয়া রশিদ প্রদান করা হলো।' : 'Received with thanks in cash and receipt issued.'}
+            <p
+              style={{
+                fontSize: '11px',
+                color: '#047857',
+                margin: '6px 0 0 0',
+                fontWeight: '500',
+              }}
+            >
+              {language === 'bn'
+                ? 'নগদে বুঝিয়া পাইয়া রশিদ প্রদান করা হলো।'
+                : 'Received with thanks in cash and receipt issued.'}
             </p>
           </div>
 
           {payment.note && (
-            <p className="text-[11px] text-slate-500 italic border-l-2 border-emerald-300 pl-2">
+            <p
+              style={{
+                fontSize: '11px',
+                color: '#64748b',
+                fontStyle: 'italic',
+                borderLeft: '3px solid #6ee7b7',
+                paddingLeft: '10px',
+                margin: 0,
+              }}
+            >
               {t('payments.note')}: {payment.note}
             </p>
           )}
 
           {/* Signatures */}
-          <div className="pt-5 pb-1 flex items-end justify-between text-[11px] text-slate-500">
-            <div className="text-center">
-              <div className="w-24 border-t border-slate-400 pt-1 font-medium text-slate-600">
+          <div
+            style={{
+              paddingTop: '20px',
+              paddingBottom: '4px',
+              display: 'flex',
+              alignItems: 'flex-end',
+              justifyContent: 'space-between',
+              fontSize: '11px',
+              color: '#64748b',
+            }}
+          >
+            <div style={{ textAlign: 'center' }}>
+              <div
+                style={{
+                  width: '110px',
+                  borderTop: '1.5px solid #94a3b8',
+                  paddingTop: '4px',
+                  fontWeight: '600',
+                  color: '#475569',
+                }}
+              >
                 {language === 'bn' ? 'গ্রাহকের স্বাক্ষর' : "Customer's Signature"}
               </div>
             </div>
-            <div className="text-center">
-              <div className="w-28 border-t border-slate-400 pt-1 font-bold text-slate-800">
+            <div style={{ textAlign: 'center' }}>
+              <div
+                style={{
+                  width: '120px',
+                  borderTop: '1.5px solid #94a3b8',
+                  paddingTop: '4px',
+                  fontWeight: '800',
+                  color: '#0f172a',
+                }}
+              >
                 {language === 'bn' ? 'দায়িত্বপ্রাপ্ত কর্মকর্তা' : 'Authorized Officer'}
               </div>
             </div>

@@ -78,25 +78,3 @@ html {
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
 }
-
-/* Print styling for receipts */
-@media print {
-  body * {
-    visibility: hidden !important;
-  }
-  #printable-receipt, #printable-receipt * {
-    visibility: visible !important;
-  }
-  #printable-receipt {
-    position: absolute !important;
-    left: 50% !important;
-    top: 20px !important;
-    transform: translateX(-50%) !important;
-    width: 100% !important;
-    max-width: 520px !important;
-    margin: 0 auto !important;
-    border: 1px solid #047857 !important;
-    box-shadow: none !important;
-    padding: 24px !important;
-  }
-}
