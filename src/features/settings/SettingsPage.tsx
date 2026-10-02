@@ -22,6 +22,7 @@ import {
   Bell,
   BellRing,
   RotateCw,
+  Download,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -631,22 +632,39 @@ export const SettingsPage: React.FC = () => {
       </Card>
 
       {/* Android Native APK Card */}
-      <Card className="border-emerald-100 bg-emerald-50/20">
-        <CardHeader>
+      <Card className="border-emerald-200/80 bg-gradient-to-br from-emerald-50/40 via-white to-white shadow-2xs">
+        <CardHeader className="pb-2">
           <div className="flex items-center gap-2">
             <Smartphone className="w-5 h-5 text-emerald-700" />
             <CardTitle>{language === 'bn' ? 'অ্যান্ড্রয়েড মোবাইল অ্যাপ (Android Native App)' : 'Android Native Mobile App'}</CardTitle>
           </div>
         </CardHeader>
-        <CardContent className="space-y-2">
+        <CardContent className="space-y-3">
           <p className="text-xs text-slate-600">
             {language === 'bn'
               ? 'মোবাইল সংস্করণ সম্পূর্ণ প্রস্তুত। ক্যামেরা, পিন লক এবং লোকাল নোটিফিকেশন সহ অ্যান্ড্রয়েড APK বিল্ড সফল হয়েছে।'
               : 'Mobile app is ready. Android APK built with camera capture, PIN security lock, and scheduled notifications.'}
           </p>
-          <p className="text-[11px] font-mono bg-white p-2 rounded-lg border border-emerald-200 text-slate-700 break-all">
-            Release APK: app-release.apk
-          </p>
+
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3 bg-white rounded-xl border border-emerald-200 shadow-2xs">
+            <div className="space-y-0.5">
+              <span className="text-xs font-bold text-slate-900 block">
+                {language === 'bn' ? 'অফিশিয়াল রিলিজ APK ফাইল' : 'Official Release APK'}
+              </span>
+              <span className="text-[11px] font-mono text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 inline-block">
+                app-release.apk (v1.0 • ~11.3 MB)
+              </span>
+            </div>
+
+            <a
+              href="/app-release.apk"
+              download="PledgeBook.apk"
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-700/20 transition-all active:scale-95 text-center shrink-0 cursor-pointer"
+            >
+              <Download className="w-4 h-4" />
+              <span>{language === 'bn' ? 'APK ডাউনলোড করুন' : 'Download APK'}</span>
+            </a>
+          </div>
         </CardContent>
       </Card>
 
