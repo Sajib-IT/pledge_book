@@ -7,7 +7,6 @@ import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import {
   Globe,
-  Shield,
   Store,
   LogOut,
   Check,
@@ -38,7 +37,7 @@ import {
 import { Badge } from '../../components/ui/badge';
 
 export const SettingsPage: React.FC = () => {
-  const { profile, role, isOwner, logout, switchDemoRole, isMockMode } = useAuth();
+  const { isOwner, logout } = useAuth();
   const { isLockEnabled, enableLock, disableLock, lockApp } = useAppLock();
   const { language, setLanguage, t } = useI18n();
   const navigate = useNavigate();
@@ -625,43 +624,12 @@ export const SettingsPage: React.FC = () => {
             মোবাইল সংস্করণ সম্পূর্ণ প্রস্তুত। ক্যামেরা, পিন লক এবং লোকাল নোটিফিকেশন সহ অ্যান্ড্রয়েড APK বিল্ড সফল হয়েছে।
           </p>
           <p className="text-[11px] font-mono bg-white p-2 rounded-lg border border-emerald-200 text-slate-700 break-all">
-            APK Path: android/app/build/outputs/apk/debug/app-debug.apk
+            Release APK: app-release.apk
           </p>
         </CardContent>
       </Card>
 
-      {/* Demo / Mock Role Switcher (Only in mock / offline mode) */}
-      {isMockMode && (
-        <Card className="border-indigo-100 bg-indigo-50/20">
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Shield className="w-5 h-5 text-indigo-600" />
-              <CardTitle>ব্যবহারকারী ভূমিকা (Role Switcher)</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <p className="text-xs text-slate-600">
-              বর্তমান সক্রিয় প্রোফাইল: <strong className="text-slate-900">{profile?.name}</strong> ({role})
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              <Button
-                type="button"
-                variant={role === 'owner' ? 'primary' : 'outline'}
-                onClick={() => switchDemoRole('owner')}
-              >
-                মালিক (Owner Role)
-              </Button>
-              <Button
-                type="button"
-                variant={role === 'staff' ? 'primary' : 'outline'}
-                onClick={() => switchDemoRole('staff')}
-              >
-                কর্মচারী (Staff Role)
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+
 
       {/* Logout Button */}
       <Button
