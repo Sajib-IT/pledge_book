@@ -1,26 +1,37 @@
 // src/lib/notifications.ts
-// Local notifications manager using @capacitor/local-notifications
-// Handles notification channel initialization, permissions, scheduling, syncing, and test alerts.
+// Local notifications manager using @capacitor/local-notifications and Web Notifications
+// Handles notification channel initialization, permissions, scheduling, syncing, sound, and test alerts.
 
 import { LocalNotifications, type PermissionStatus } from '@capacitor/local-notifications';
+import { Capacitor } from '@capacitor/core';
 import type { Mortgage } from '../types/database';
 import { formatBDT } from './calculations';
 
-export const NOTIFICATION_CHANNEL_ID = 'mortgage_reminders';
+// Updated channel ID to ensure Android recreates the channel with default sound
+export const NOTIFICATION_CHANNEL_ID = 'pledgebook_mortgage_alerts_v2';
+export const LEGACY_CHANNEL_ID = 'mortgage_reminders';
 
 /**
- * Initializes the Android notification channel with high importance, vibration, and custom sound.
+ * Initializes the Android notification channel with high importance, vibration, and system sound.
  * Android 8.0+ (API 26+) requires a notification channel for alerts to show properly.
  */
 export async function initNotificationChannel(): Promise<void> {
   try {
+    // Delete legacy channel that had invalid custom sound URI
+    try {
+      await LocalNotifications.deleteChannel({ id: LEGACY_CHANNEL_ID });
+    } catch {
+      // Ignored if channel doesn't exist
+    }
+
+    // Create the active channel with max importance and vibration
+    // Omitting custom sound allows Android to use the device's native system notification sound
     await LocalNotifications.createChannel({
       id: NOTIFICATION_CHANNEL_ID,
-      name: 'বন্ধকী ও মেয়াদ রিমাইন্ডার (Mortgage Reminders)',
+      name: 'বন্ধকী ও মেয়াদ রিমাইন্ডার (Mortgage Alerts)',
       description: 'Alerts for upcoming and overdue mortgage due dates',
       importance: 5, // NotificationImportance.High
       visibility: 1, // NotificationVisibility.Public
-      sound: 'beep.wav',
       vibration: true,
       lights: true,
       lightColor: '#059669', // Emerald
@@ -32,10 +43,60 @@ export async function initNotificationChannel(): Promise<void> {
 }
 
 /**
+ * Synthesizes a crisp, pleasant two-tone notification chime (880Hz -> 1320Hz)
+ * using the Web Audio API. Works reliably on all browsers and mobile WebViews without external audio files.
+ */
+export function playNotificationSound(): void {
+  try {
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
+
+    const now = ctx.currentTime;
+
+    // Tone 1: High crisp ding (880 Hz - A5)
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(880, now);
+    gain1.gain.setValueAtTime(0.4, now);
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    osc1.start(now);
+    osc1.stop(now + 0.3);
+
+    // Tone 2: Harmonic resolving chime (1320 Hz - E6)
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(1320, now + 0.12);
+    gain2.gain.setValueAtTime(0.45, now + 0.12);
+    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc2.start(now + 0.12);
+    osc2.stop(now + 0.55);
+  } catch (err) {
+    console.debug('Audio chime synthesis error:', err);
+  }
+}
+
+/**
  * Checks the current notification permission status.
  */
 export async function checkNotificationPermission(): Promise<PermissionStatus['display']> {
   try {
+    if (!Capacitor.isNativePlatform() && 'Notification' in window) {
+      const perm = Notification.permission;
+      if (perm === 'granted') return 'granted';
+      if (perm === 'denied') return 'denied';
+      return 'prompt';
+    }
     const status = await LocalNotifications.checkPermissions();
     return status.display;
   } catch (err) {
@@ -49,6 +110,14 @@ export async function checkNotificationPermission(): Promise<PermissionStatus['d
  */
 export async function requestNotificationPermissions(): Promise<boolean> {
   try {
+    if (!Capacitor.isNativePlatform() && 'Notification' in window) {
+      if (Notification.permission === 'granted') {
+        return true;
+      }
+      const res = await Notification.requestPermission();
+      return res === 'granted';
+    }
+
     const status = await LocalNotifications.checkPermissions();
     if (status.display === 'granted') {
       return true;
@@ -155,7 +224,6 @@ export async function scheduleMortgageNotifications(
           body: reminder.body,
           schedule: { at: scheduleDate, allowWhileIdle: true },
           channelId: NOTIFICATION_CHANNEL_ID,
-          sound: 'beep.wav',
           extra: {
             mortgageId: mortgage.id,
             mortgageNo: mortgage.mortgage_no,
@@ -213,34 +281,70 @@ export async function syncAllMortgageNotifications(
 }
 
 /**
- * Sends an immediate test notification (fires 3 seconds later) so the shop owner
- * can verify that notifications, sound, and vibration are working properly on their device.
+ * Sends a test notification immediately so the shop owner can verify that notifications,
+ * sound, and vibration are working properly on their device.
+ * Ensures fresh unique tags/IDs so repeated clicks always trigger sound and alert without page refresh.
  */
 export async function sendTestNotification(lang: 'bn' | 'en' = 'bn'): Promise<boolean> {
   try {
+    // 1. Play immediate audio chime through device speakers
+    playNotificationSound();
+
+    const title =
+      lang === 'bn'
+        ? '🔔 টেস্ট নোটিফিকেশন (PledgeBook)'
+        : '🔔 Test Notification (PledgeBook)';
+    const body =
+      lang === 'bn'
+        ? 'আপনার ফোনে বন্ধকী নোটিফিকেশন সফলভাবে চালু রয়েছে। মেয়াদোত্তীর্ণের অ্যালার্ট যথাসময়ে পাবেন।'
+        : 'Mobile notifications are working successfully on your device! You will receive due date alerts on time.';
+
+    // 2. Direct browser notification handling on Web for instant repeat testing
+    if (!Capacitor.isNativePlatform() && 'Notification' in window) {
+      let perm = Notification.permission;
+      if (perm === 'default') {
+        perm = await Notification.requestPermission();
+      }
+      if (perm === 'granted') {
+        // Unique tag ensures the browser never suppresses repeated notifications
+        const uniqueTag = `pledgebook-test-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+        try {
+          const n = new Notification(title, {
+            body,
+            icon: '/app-icon.jpg',
+            tag: uniqueTag,
+          });
+          n.onclick = () => {
+            window.focus();
+            n.close();
+          };
+          return true;
+        } catch (e) {
+          console.warn('Direct web notification failed, falling back to LocalNotifications:', e);
+        }
+      } else if (perm === 'denied') {
+        return false;
+      }
+    }
+
+    // 3. Native Android / iOS via Capacitor LocalNotifications
     const hasPermission = await requestNotificationPermissions();
     if (!hasPermission) return false;
 
     await initNotificationChannel();
 
-    const testId = 999999;
-    const fireTime = new Date(Date.now() + 3000); // 3 seconds in future
+    // Unique random ID for each notification so it never collides or gets deduplicated
+    const testId = Math.floor(Math.random() * 899999) + 100000;
+    const fireTime = new Date(Date.now() + 500); // 500ms delay to show immediately
 
     await LocalNotifications.schedule({
       notifications: [
         {
           id: testId,
-          title:
-            lang === 'bn'
-              ? '🔔 টেস্ট নোটিফিকেশন (PledgeBook)'
-              : '🔔 Test Notification (PledgeBook)',
-          body:
-            lang === 'bn'
-              ? 'আপনার স্মার্টফোনে বন্ধকী নোটিফিকেশন সফলভাবে চালু রয়েছে। মেয়াদোত্তীর্ণের অ্যালার্ট যথাসময়ে পাবেন।'
-              : 'Mobile notifications are working successfully on your device! You will receive due date alerts on time.',
+          title,
+          body,
           schedule: { at: fireTime, allowWhileIdle: true },
           channelId: NOTIFICATION_CHANNEL_ID,
-          sound: 'beep.wav',
           extra: {
             isTest: true,
           },

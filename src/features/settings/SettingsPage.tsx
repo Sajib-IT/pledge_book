@@ -94,8 +94,8 @@ export const SettingsPage: React.FC = () => {
       setNotificationPermission('granted');
       setTestNotifFeedback(
         language === 'bn'
-          ? 'টেস্ট অ্যালার্ট পাঠানো হয়েছে! ৩ সেকেন্ডের মধ্যে ফোনে নোটিফিকেশন আসবে।'
-          : 'Test alert scheduled! It will ring/vibrate on your phone in 3 seconds.'
+          ? 'টেস্ট অ্যালার্ট পাঠানো হয়েছে! নোটিফিকেশন ব্যানার ও সাউন্ড সফলভাবে বেজেছে।'
+          : 'Test alert sent! Notification banner and sound chime triggered successfully.'
       );
     } else {
       setTestNotifFeedback(
