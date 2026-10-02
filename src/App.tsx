@@ -7,6 +7,7 @@ import { AppLockProvider } from './features/auth/AppLockContext';
 import { PinLockOverlay } from './features/auth/PinLockOverlay';
 import { ProtectedRoute } from './features/auth/ProtectedRoute';
 import { LoginForm } from './features/auth/LoginForm';
+import { RegisterForm } from './features/auth/RegisterForm';
 import { Header } from './components/common/Header';
 import { BottomNav } from './components/common/BottomNav';
 import { OfflineBanner } from './components/common/OfflineBanner';
@@ -62,8 +63,9 @@ export const App: React.FC = () => {
             <PinLockOverlay />
             <BrowserRouter>
               <Routes>
-              {/* Public Login Route */}
+              {/* Public Auth Routes */}
               <Route path="/login" element={<LoginForm />} />
+              <Route path="/register" element={<RegisterForm />} />
 
               {/* Protected App Routes */}
               <Route

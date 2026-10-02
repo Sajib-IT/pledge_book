@@ -12,6 +12,13 @@ interface AuthContextType {
   isOwner: boolean;
   isLoading: boolean;
   login: (email: string, pass: string) => Promise<{ success: boolean; error?: string }>;
+  registerUser: (params: {
+    name: string;
+    email: string;
+    phone?: string;
+    password: string;
+    role?: UserRole;
+  }) => Promise<{ success: boolean; error?: string; requiresEmailConfirmation?: boolean }>;
   logout: () => Promise<void>;
   switchDemoRole: (role: UserRole) => void;
   isMockMode: boolean;
@@ -47,7 +54,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isMockMode, setIsMockMode] = useState<boolean>(!isSupabaseConfigured);
 
-  const fetchProfile = async (userId: string) => {
+  const fetchProfile = async (userId: string, userMetadata?: any) => {
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -55,8 +62,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .eq('id', userId)
         .single();
 
-      if (error) {
-        console.error('Failed to fetch profile:', error);
+      if (error || !data) {
+        console.warn('Profile not found in profiles table:', error);
+        // Fallback profile if trigger hasn't run or table empty
+        const fallbackProfile: Profile = {
+          id: userId,
+          name: userMetadata?.name || userMetadata?.full_name || 'User',
+          role: (userMetadata?.role || 'owner') as UserRole,
+          phone: userMetadata?.phone || null,
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        setProfile(fallbackProfile);
         return;
       }
       setProfile(data);
@@ -89,7 +107,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        fetchProfile(session.user.id);
+        fetchProfile(session.user.id, session.user.user_metadata);
       }
       setIsLoading(false);
     });
@@ -98,7 +116,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        fetchProfile(session.user.id);
+        fetchProfile(session.user.id, session.user.user_metadata);
       } else {
         setProfile(null);
       }
@@ -110,14 +128,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  const login = async (email: string, pass: string): Promise<{ success: boolean; error?: string }> => {
+  const login = async (emailOrPhone: string, pass: string): Promise<{ success: boolean; error?: string }> => {
     if (isMockMode) {
-      const isOwnerLogin = email.includes('owner') || email.includes('rafiq') || pass === 'owner';
+      const isOwnerLogin = emailOrPhone.includes('owner') || emailOrPhone.includes('rafiq') || pass === 'owner';
       const chosen = isOwnerLogin ? DEMO_OWNER_PROFILE : DEMO_STAFF_PROFILE;
       setProfile(chosen);
       setUser({
         id: chosen.id,
-        email,
+        email: emailOrPhone,
         app_metadata: {},
         user_metadata: { name: chosen.name },
         aud: 'authenticated',
@@ -128,21 +146,87 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password: pass,
-      });
+      const cleanInput = emailOrPhone.trim();
+      const credentials = cleanInput.includes('@')
+        ? { email: cleanInput, password: pass }
+        : { phone: cleanInput, password: pass };
+
+      const { data, error } = await supabase.auth.signInWithPassword(credentials as any);
 
       if (error) {
         return { success: false, error: error.message };
       }
 
       if (data.user) {
-        await fetchProfile(data.user.id);
+        await fetchProfile(data.user.id, data.user.user_metadata);
       }
       return { success: true };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Unknown login error';
+      return { success: false, error: msg };
+    }
+  };
+
+  const registerUser = async (params: {
+    name: string;
+    email: string;
+    phone?: string;
+    password: string;
+    role?: UserRole;
+  }): Promise<{ success: boolean; error?: string; requiresEmailConfirmation?: boolean }> => {
+    if (isMockMode) {
+      const newProfile: Profile = {
+        id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `mock-${Date.now()}`,
+        name: params.name.trim(),
+        role: params.role || 'owner',
+        phone: params.phone?.trim() || null,
+        is_active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      setProfile(newProfile);
+      setUser({
+        id: newProfile.id,
+        email: params.email.trim(),
+        app_metadata: {},
+        user_metadata: { name: newProfile.name, phone: newProfile.phone },
+        aud: 'authenticated',
+        created_at: newProfile.created_at,
+      } as unknown as User);
+      localStorage.setItem('mock_user_role', newProfile.role);
+      return { success: true, requiresEmailConfirmation: false };
+    }
+
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: params.email.trim(),
+        password: params.password,
+        options: {
+          data: {
+            name: params.name.trim(),
+            full_name: params.name.trim(),
+            phone: params.phone?.trim() || null,
+            role: params.role || 'owner',
+          },
+        },
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      if (data.session && data.user) {
+        setSession(data.session);
+        setUser(data.user);
+        await fetchProfile(data.user.id, data.user.user_metadata);
+        return { success: true, requiresEmailConfirmation: false };
+      } else if (data.user && !data.session) {
+        return { success: true, requiresEmailConfirmation: true };
+      }
+
+      return { success: true, requiresEmailConfirmation: false };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown registration error';
       return { success: false, error: msg };
     }
   };
@@ -183,6 +267,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isOwner,
         isLoading,
         login,
+        registerUser,
         logout,
         switchDemoRole,
         isMockMode,
