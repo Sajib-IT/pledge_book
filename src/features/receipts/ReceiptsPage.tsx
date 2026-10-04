@@ -1,6 +1,8 @@
 // src/features/receipts/ReceiptsPage.tsx
 import React, { useState } from 'react';
-import { useMortgages } from '../mortgages/useMortgages';
+import { useQuery } from '@tanstack/react-query';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { useAuth } from '../auth/AuthContext';
 import { ReceiptModal } from './ReceiptModal';
 import { useI18n } from '../../lib/i18n';
 import { formatBDT, formatDateDhaka } from '../../lib/calculations';
@@ -15,46 +17,33 @@ import { Search, Printer, Calendar, FileText, ArrowUpRight } from 'lucide-react'
 import { Link } from 'react-router-dom';
 
 export const ReceiptsPage: React.FC = () => {
+  const { isMockMode } = useAuth();
   const { language, t } = useI18n();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedReceipt, setSelectedReceipt] = useState<{ payment: Payment; mortgage: Mortgage } | null>(null);
 
-  const { data: mortgages = [], isLoading, isError, error, refetch } = useMortgages();
+  const { data: allReceipts = [], isLoading, isError, error, refetch } = useQuery({
+    queryKey: ['receipts_list', isMockMode],
+    queryFn: async (): Promise<Array<{ payment: Payment; mortgage: Mortgage }>> => {
+      if (isMockMode || !isSupabaseConfigured) {
+        return [];
+      }
 
-  // In mock/demo mode or live, gather payments from mortgages or demo list
-  // Let's extract all payments with their associated mortgages
-  const allReceipts = [
-    {
-      payment: {
-        id: '30000000-0000-0000-0000-000000000001',
-        receipt_no: 'REC-202510-5001',
-        mortgage_id: '20000000-0000-0000-0000-000000000003',
-        paid_on: new Date(Date.now() - 5 * 86400000).toISOString().split('T')[0],
-        type: 'interest' as const,
-        amount: 24000,
-        received_by: null,
-        note: 'First year interest renewal received.',
-        original_payment_id: null,
-        created_at: new Date(Date.now() - 5 * 86400000).toISOString(),
-      },
-      mortgage: mortgages.find((m) => m.id === '20000000-0000-0000-0000-000000000003') || mortgages[0],
+      const { data, error: payErr } = await supabase
+        .from('payments')
+        .select('*, mortgage:mortgages(*, customer:customers(*))')
+        .order('paid_on', { ascending: false });
+
+      if (payErr) throw payErr;
+
+      return (data || [])
+        .filter((p: any) => Boolean(p.mortgage))
+        .map((p: any) => ({
+          payment: p as Payment,
+          mortgage: p.mortgage as Mortgage,
+        }));
     },
-    {
-      payment: {
-        id: '30000000-0000-0000-0000-000000000002',
-        receipt_no: 'REC-202509-5002',
-        mortgage_id: '20000000-0000-0000-0000-000000000004',
-        paid_on: new Date(Date.now() - 15 * 86400000).toISOString().split('T')[0],
-        type: 'full_payment' as const,
-        amount: 37500,
-        received_by: null,
-        note: 'Full settlement: 30,000 Principal + 7,500 Interest.',
-        original_payment_id: null,
-        created_at: new Date(Date.now() - 15 * 86400000).toISOString(),
-      },
-      mortgage: mortgages.find((m) => m.id === '20000000-0000-0000-0000-000000000004') || mortgages[1] || mortgages[0],
-    },
-  ];
+  });
 
   const filteredReceipts = allReceipts.filter(({ payment, mortgage }) => {
     if (!mortgage) return false;
