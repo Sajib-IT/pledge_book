@@ -36,8 +36,16 @@ import type { CollateralType } from '../../types/database';
 
 const mortgageSchema = z.object({
   customer_id: z.string().min(1, 'গ্রাহক নির্বাচন করুন'),
-  principal: z.coerce.number().min(100, 'আসল টাকা কমপক্ষে ১০০ হতে হবে'),
-  interest_rate: z.coerce.number().min(0, 'সুদের হার ০ বা তার বেশি হতে হবে'),
+  principal: z.preprocess(
+    (val) => (val === '' || val === null || val === undefined || (typeof val === 'number' && isNaN(val)) ? undefined : Number(val)),
+    z.number({ required_error: 'আসল টাকা লিখুন', invalid_type_error: 'আসল টাকা সঠিকভাবে লিখুন' })
+      .min(100, 'আসল টাকা কমপক্ষে ১০০ হতে হবে')
+  ),
+  interest_rate: z.preprocess(
+    (val) => (val === '' || val === null || val === undefined || (typeof val === 'number' && isNaN(val)) ? undefined : Number(val)),
+    z.number({ required_error: 'সুদের হার লিখুন', invalid_type_error: 'সুদের হার সঠিকভাবে লিখুন' })
+      .min(0, 'সুদের হার ০ বা তার বেশি হতে হবে')
+  ),
   start_date: z.string().min(1, 'শুরুর তারিখ দিন'),
   due_date: z.string().min(1, 'মেয়াদ উত্তীর্ণের তারিখ দিন'),
   collateral_type: z.enum(['gold', 'land', 'vehicle', 'electronics', 'other']),
@@ -75,7 +83,7 @@ export const NewMortgagePage: React.FC = () => {
     resolver: zodResolver(mortgageSchema) as any,
     defaultValues: {
       customer_id: preselectedCustomerId || '',
-      principal: 40000,
+      principal: '' as unknown as number,
       interest_rate: defaultRate,
       start_date: todayStr,
       due_date: nextYearStr,
@@ -260,7 +268,7 @@ export const NewMortgagePage: React.FC = () => {
                 label={t('mortgages.principal')}
                 type="number"
                 step="500"
-                placeholder="40000"
+                placeholder={language === 'bn' ? 'টাকার পরিমাণ লিখুন...' : 'Enter amount in BDT...'}
                 {...register('principal', { valueAsNumber: true })}
                 error={errors.principal?.message}
                 helperText={t('mortgages.principal_helper')}
