@@ -219,6 +219,28 @@ export function toBanglaDigits(val: string | number): string {
 }
 
 /**
+ * Converts Bangla digits (০-৯) to standard English digits (0-9).
+ */
+export function toEnglishDigits(val: string | number): string {
+  const banglaDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+  let str = String(val ?? '');
+  banglaDigits.forEach((digit, idx) => {
+    str = str.replaceAll(digit, String(idx));
+  });
+  return str;
+}
+
+/**
+ * Parses numeric string from either English or Bangla digits, ignoring commas.
+ */
+export function parseBanglaOrEnglishNumber(val: string | number | null | undefined): number {
+  if (val === null || val === undefined || val === '') return 0;
+  const englishStr = toEnglishDigits(val).replace(/,/g, '').trim();
+  const num = parseFloat(englishStr);
+  return isNaN(num) ? 0 : num;
+}
+
+/**
  * Formats an integer amount into BDT (Taka) format.
  * E.g., 40000 -> ৳ ৪০,০০০ (bn) or ৳ 40,000 (en)
  */

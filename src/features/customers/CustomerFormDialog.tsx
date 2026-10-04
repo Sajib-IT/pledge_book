@@ -35,12 +35,14 @@ interface CustomerFormDialogProps {
   isOpen: boolean;
   onClose: () => void;
   customerToEdit?: Customer | null;
+  onSuccess?: (createdCustomer: Customer) => void;
 }
 
 export const CustomerFormDialog: React.FC<CustomerFormDialogProps> = ({
   isOpen,
   onClose,
   customerToEdit,
+  onSuccess,
 }) => {
   const { language, t } = useI18n();
   const createMutation = useCreateCustomer();
@@ -196,7 +198,7 @@ export const CustomerFormDialog: React.FC<CustomerFormDialogProps> = ({
           notes: data.notes || undefined,
         });
       } else {
-        await createMutation.mutateAsync({
+        const created = await createMutation.mutateAsync({
           name: data.name,
           phone: data.phone,
           address: data.address || undefined,
@@ -205,6 +207,9 @@ export const CustomerFormDialog: React.FC<CustomerFormDialogProps> = ({
           nid_photo_path: finalNidPhoto || undefined,
           notes: data.notes || undefined,
         });
+        if (onSuccess) {
+          onSuccess(created);
+        }
       }
       onClose();
     } catch (err) {

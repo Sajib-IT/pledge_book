@@ -11,6 +11,7 @@ import {
   calculateCloseAmount,
   formatBDT,
   getTodayDhakaDateString,
+  parseBanglaOrEnglishNumber,
 } from '../../lib/calculations';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -24,6 +25,7 @@ import {
   Gem,
   Plus,
   Trash2,
+  Search,
 } from 'lucide-react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { captureFromCamera, pickFromGallery, readFileAsDataUrl } from '../../lib/media';
@@ -37,12 +39,12 @@ import type { CollateralType } from '../../types/database';
 const mortgageSchema = z.object({
   customer_id: z.string().min(1, 'গ্রাহক নির্বাচন করুন'),
   principal: z.preprocess(
-    (val) => (val === '' || val === null || val === undefined || (typeof val === 'number' && isNaN(val)) ? undefined : Number(val)),
+    (val) => parseBanglaOrEnglishNumber(val as string | number),
     z.number({ required_error: 'আসল টাকা লিখুন', invalid_type_error: 'আসল টাকা সঠিকভাবে লিখুন' })
       .min(100, 'আসল টাকা কমপক্ষে ১০০ হতে হবে')
   ),
   interest_rate: z.preprocess(
-    (val) => (val === '' || val === null || val === undefined || (typeof val === 'number' && isNaN(val)) ? undefined : Number(val)),
+    (val) => parseBanglaOrEnglishNumber(val as string | number),
     z.number({ required_error: 'সুদের হার লিখুন', invalid_type_error: 'সুদের হার সঠিকভাবে লিখুন' })
       .min(0, 'সুদের হার ০ বা তার বেশি হতে হবে')
   ),
@@ -65,6 +67,7 @@ export const NewMortgagePage: React.FC = () => {
 
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
   const [collateralPhotos, setCollateralPhotos] = useState<string[]>([]);
+  const [customerSearch, setCustomerSearch] = useState('');
 
   const todayStr = getTodayDhakaDateString();
   const nextYearDate = new Date();
@@ -72,6 +75,9 @@ export const NewMortgagePage: React.FC = () => {
   const nextYearStr = nextYearDate.toISOString().split('T')[0];
 
   const defaultRate = Number(localStorage.getItem('default_interest_rate') || '25.00');
+
+  const [principalInput, setPrincipalInput] = useState<string>('');
+  const [interestRateInput, setInterestRateInput] = useState<string>(() => defaultRate.toString());
 
   const {
     register,
@@ -83,7 +89,7 @@ export const NewMortgagePage: React.FC = () => {
     resolver: zodResolver(mortgageSchema) as any,
     defaultValues: {
       customer_id: preselectedCustomerId || '',
-      principal: '' as unknown as number,
+      principal: 0,
       interest_rate: defaultRate,
       start_date: todayStr,
       due_date: nextYearStr,
@@ -235,22 +241,65 @@ export const NewMortgagePage: React.FC = () => {
             </div>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div>
-              <select
-                {...register('customer_id')}
-                className="w-full h-11 px-3 rounded-xl border border-slate-300 bg-white text-sm text-slate-900 focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20"
-              >
-                <option value="">{t('mortgages.customer_select_placeholder')}</option>
-                {customers.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name} ({c.phone})
-                  </option>
-                ))}
-              </select>
-              {errors.customer_id && (
-                <p className="text-xs font-medium text-rose-600 mt-1">{errors.customer_id.message}</p>
-              )}
-            </div>
+            {customers.length === 0 ? (
+              <div className="p-4 rounded-xl border border-dashed border-emerald-300 bg-emerald-50/50 text-center space-y-2.5">
+                <p className="text-xs sm:text-sm text-slate-700 font-medium">
+                  {language === 'bn'
+                    ? 'কোনো গ্রাহক পাওয়া যায়নি। বন্ধক তৈরি করতে প্রথমে গ্রাহক যোগ করুন।'
+                    : 'No customers found. Please add a customer first to issue a mortgage.'}
+                </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="primary"
+                  className="gap-1.5 mx-auto"
+                  onClick={() => setIsCustomerModalOpen(true)}
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  <span>{t('customers.add_customer')}</span>
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="relative">
+                  <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder={
+                      language === 'bn'
+                        ? 'গ্রাহক খুঁজুন (নাম বা ফোন)...'
+                        : 'Search customer (name or phone)...'
+                    }
+                    value={customerSearch}
+                    onChange={(e) => setCustomerSearch(e.target.value)}
+                    className="w-full h-10 pl-9 pr-3 rounded-xl border border-slate-200 bg-slate-50/80 text-xs text-slate-900 focus:outline-none focus:bg-white focus:border-emerald-600 focus:ring-1 focus:ring-emerald-500 transition-colors"
+                  />
+                </div>
+                <select
+                  {...register('customer_id')}
+                  className="w-full h-11 px-3 rounded-xl border border-slate-300 bg-white text-sm text-slate-900 focus:outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/20"
+                >
+                  <option value="">{t('mortgages.customer_select_placeholder')}</option>
+                  {customers
+                    .filter((c) => {
+                      const q = customerSearch.trim().toLowerCase();
+                      if (!q) return true;
+                      return (
+                        c.name.toLowerCase().includes(q) ||
+                        (c.phone && c.phone.includes(q))
+                      );
+                    })
+                    .map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} ({c.phone})
+                      </option>
+                    ))}
+                </select>
+              </div>
+            )}
+            {errors.customer_id && (
+              <p className="text-xs font-medium text-rose-600 mt-1">{errors.customer_id.message}</p>
+            )}
           </CardContent>
         </Card>
 
@@ -266,20 +315,32 @@ export const NewMortgagePage: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input
                 label={t('mortgages.principal')}
-                type="number"
-                step="500"
-                placeholder={language === 'bn' ? 'টাকার পরিমাণ লিখুন...' : 'Enter amount in BDT...'}
-                {...register('principal', { valueAsNumber: true })}
+                type="text"
+                inputMode="numeric"
+                placeholder={language === 'bn' ? 'টাকার পরিমাণ লিখুন (যেমন: ৫০০০০)' : 'Enter amount in BDT (e.g. 50000)'}
+                value={principalInput}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  setPrincipalInput(raw);
+                  const parsed = parseBanglaOrEnglishNumber(raw);
+                  setValue('principal', parsed, { shouldValidate: true });
+                }}
                 error={errors.principal?.message}
                 helperText={t('mortgages.principal_helper')}
               />
 
               <Input
                 label={t('mortgages.interest_rate')}
-                type="number"
-                step="0.5"
+                type="text"
+                inputMode="decimal"
                 placeholder="25.00"
-                {...register('interest_rate', { valueAsNumber: true })}
+                value={interestRateInput}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  setInterestRateInput(raw);
+                  const parsed = parseBanglaOrEnglishNumber(raw);
+                  setValue('interest_rate', parsed, { shouldValidate: true });
+                }}
                 error={errors.interest_rate?.message}
                 helperText={t('mortgages.interest_helper')}
               />
@@ -486,6 +547,9 @@ export const NewMortgagePage: React.FC = () => {
       <CustomerFormDialog
         isOpen={isCustomerModalOpen}
         onClose={() => setIsCustomerModalOpen(false)}
+        onSuccess={(created) => {
+          setValue('customer_id', created.id, { shouldValidate: true });
+        }}
       />
     </div>
   );
