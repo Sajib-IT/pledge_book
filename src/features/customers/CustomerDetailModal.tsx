@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Dialog } from '../../components/ui/dialog';
 import { Button } from '../../components/ui/button';
 import { useI18n } from '../../lib/i18n';
 import type { Customer } from '../../types/database';
-import { Phone, MessageSquare, CreditCard, MapPin, FileText, User } from 'lucide-react';
+import { Phone, MessageSquare, CreditCard, MapPin, FileText, User, ZoomIn } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { ImageZoomModal } from '../../components/ui/image-zoom-modal';
 
 interface CustomerDetailModalProps {
   customer: Customer | null;
@@ -21,6 +22,7 @@ export const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
 }) => {
   const { t, language } = useI18n();
   const navigate = useNavigate();
+  const [zoomedImage, setZoomedImage] = useState<{ src: string; title: string } | null>(null);
 
   if (!customer) return null;
 
@@ -45,8 +47,9 @@ export const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
   };
 
   return (
-    <Dialog
-      isOpen={isOpen}
+    <>
+      <Dialog
+        isOpen={isOpen}
       onClose={onClose}
       title={customer.name}
       description={language === 'en' ? 'Customer Profile & Details' : 'গ্রাহক বিবরণী ও প্রোফাইল'}
@@ -54,9 +57,18 @@ export const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
       <div className="space-y-4">
         {/* Customer Header Info */}
         <div className="flex items-center gap-4 p-4 rounded-2xl bg-gradient-to-tr from-emerald-50 to-teal-50/50 border border-emerald-100">
-          <div className="w-16 h-16 rounded-2xl bg-white shadow-md border border-emerald-200 overflow-hidden flex items-center justify-center shrink-0">
+          <div
+            className={`w-16 h-16 rounded-2xl bg-white shadow-md border border-emerald-200 overflow-hidden flex items-center justify-center shrink-0 ${customer.photo_path ? 'cursor-pointer hover:border-emerald-500 hover:shadow-lg transition-all group relative' : ''}`}
+            onClick={() => customer.photo_path && setZoomedImage({ src: customer.photo_path, title: customer.name })}
+            title={customer.photo_path ? (language === 'bn' ? 'ছবি জুম করে দেখুন' : 'Click to zoom photo') : undefined}
+          >
             {customer.photo_path ? (
-              <img src={customer.photo_path} alt={customer.name} className="w-full h-full object-cover" />
+              <>
+                <img src={customer.photo_path} alt={customer.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" />
+                <div className="absolute inset-0 bg-slate-900/0 group-hover:bg-slate-900/25 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                  <ZoomIn className="w-4 h-4 text-white drop-shadow" />
+                </div>
+              </>
             ) : (
               <User className="w-8 h-8 text-emerald-600" />
             )}
@@ -127,12 +139,29 @@ export const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
           {customer.nid_photo_path && (
             <div className="pt-2 border-t border-slate-200">
               <span className="text-xs text-slate-500 block mb-1.5 font-medium">{t('customers.nid_photo')}</span>
-              <div className="rounded-xl overflow-hidden border border-slate-200 max-h-48 bg-slate-100 flex items-center justify-center">
+              <div
+                className="group relative rounded-xl overflow-hidden border border-slate-200 max-h-48 bg-slate-100 flex items-center justify-center cursor-pointer hover:border-emerald-500 hover:shadow-md transition-all"
+                onClick={() =>
+                  setZoomedImage({
+                    src: customer.nid_photo_path!,
+                    title:
+                      language === 'bn'
+                        ? `জাতীয় পরিচয়পত্র (NID) - ${customer.name}`
+                        : `NID Document - ${customer.name}`,
+                  })
+                }
+                title={language === 'bn' ? 'NID জুম করে দেখুন' : 'Click to zoom NID document'}
+              >
                 <img
                   src={customer.nid_photo_path}
                   alt="NID Document"
-                  className="w-full h-auto max-h-48 object-contain"
+                  className="w-full h-auto max-h-48 object-contain group-hover:scale-105 transition-transform duration-200"
                 />
+                <div className="absolute inset-0 bg-slate-900/0 group-hover:bg-slate-900/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                  <span className="p-2 rounded-full bg-white/90 text-slate-800 shadow-md">
+                    <ZoomIn className="w-4 h-4 text-emerald-700" />
+                  </span>
+                </div>
               </div>
             </div>
           )}
@@ -165,5 +194,15 @@ export const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
         )}
       </div>
     </Dialog>
+
+    {zoomedImage && (
+      <ImageZoomModal
+        isOpen={Boolean(zoomedImage)}
+        onClose={() => setZoomedImage(null)}
+        images={zoomedImage.src}
+        title={zoomedImage.title}
+      />
+    )}
+  </>
   );
 };

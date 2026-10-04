@@ -39,8 +39,10 @@ import {
   ShieldCheck,
   Printer,
   Tag,
+  ZoomIn,
 } from 'lucide-react';
 import { ReceiptModal } from '../receipts/ReceiptModal';
+import { ImageZoomModal } from '../../components/ui/image-zoom-modal';
 
 export const MortgageDetailView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -76,6 +78,7 @@ export const MortgageDetailView: React.FC = () => {
     amount: number;
   } | null>(null);
   const [selectedReceiptPayment, setSelectedReceiptPayment] = useState<Payment | null>(null);
+  const [zoomedImageIndex, setZoomedImageIndex] = useState<number | null>(null);
 
   if (isLoading) {
     return <LoadingSpinner fullPage message={t('common.loading')} />;
@@ -440,17 +443,24 @@ export const MortgageDetailView: React.FC = () => {
                   <span className="text-xs font-bold text-slate-600 block">
                     {language === 'bn' ? 'সংযুক্ত জামানতের ছবিসমূহ:' : 'Attached Collateral Photos:'}
                   </span>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                     {mortgage.collateral_photo_paths.map((p, idx) => (
                       <div
                         key={idx}
-                        className="aspect-square rounded-xl bg-slate-100 border border-slate-200 overflow-hidden"
+                        onClick={() => setZoomedImageIndex(idx)}
+                        className="group relative aspect-square rounded-xl bg-slate-100 border border-slate-200 overflow-hidden cursor-pointer hover:border-emerald-500 hover:shadow-md transition-all"
+                        title={language === 'bn' ? 'জুম করে দেখতে ক্লিক করুন' : 'Click to zoom photo'}
                       >
                         <img
                           src={p}
                           alt={`Collateral ${idx + 1}`}
-                          className="w-full h-full object-cover"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
                         />
+                        <div className="absolute inset-0 bg-slate-900/0 group-hover:bg-slate-900/30 flex items-center justify-center transition-all opacity-0 group-hover:opacity-100">
+                          <span className="p-2 rounded-full bg-white/90 text-slate-800 shadow-md transform scale-90 group-hover:scale-100 transition-transform">
+                            <ZoomIn className="w-4 h-4 text-emerald-700" />
+                          </span>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -1016,6 +1026,21 @@ export const MortgageDetailView: React.FC = () => {
         isOpen={Boolean(selectedReceiptPayment)}
         onClose={() => setSelectedReceiptPayment(null)}
       />
+
+      {/* COLLATERAL PHOTO ZOOM MODAL */}
+      {zoomedImageIndex !== null && mortgage.collateral_photo_paths && (
+        <ImageZoomModal
+          isOpen={zoomedImageIndex !== null}
+          onClose={() => setZoomedImageIndex(null)}
+          images={mortgage.collateral_photo_paths}
+          initialIndex={zoomedImageIndex}
+          title={
+            language === 'bn'
+              ? `জামানতের ছবি (${mortgage.mortgage_no})`
+              : `Collateral Photo (${mortgage.mortgage_no})`
+          }
+        />
+      )}
     </div>
   );
 };

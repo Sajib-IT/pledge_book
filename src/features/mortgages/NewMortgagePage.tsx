@@ -26,7 +26,9 @@ import {
   Plus,
   Trash2,
   Search,
+  ZoomIn,
 } from 'lucide-react';
+import { ImageZoomModal } from '../../components/ui/image-zoom-modal';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { captureFromCamera, pickFromGallery, readFileAsDataUrl } from '../../lib/media';
 import {
@@ -68,6 +70,7 @@ export const NewMortgagePage: React.FC = () => {
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
   const [collateralPhotos, setCollateralPhotos] = useState<string[]>([]);
   const [customerSearch, setCustomerSearch] = useState('');
+  const [zoomedPhotoIndex, setZoomedPhotoIndex] = useState<number | null>(null);
 
   const todayStr = getTodayDhakaDateString();
   const nextYearDate = new Date();
@@ -495,13 +498,23 @@ export const NewMortgagePage: React.FC = () => {
                   {collateralPhotos.map((photo, idx) => (
                     <div
                       key={idx}
-                      className="relative group rounded-xl overflow-hidden aspect-square border border-slate-200 bg-slate-100 shadow-2xs"
+                      onClick={() => setZoomedPhotoIndex(idx)}
+                      className="relative group rounded-xl overflow-hidden aspect-square border border-slate-200 bg-slate-100 shadow-2xs cursor-pointer hover:border-emerald-500 hover:shadow-md transition-all"
+                      title={language === 'bn' ? 'জুম করে দেখতে ক্লিক করুন' : 'Click to zoom photo'}
                     >
-                      <img src={photo} alt={`Collateral ${idx + 1}`} className="w-full h-full object-cover" />
+                      <img src={photo} alt={`Collateral ${idx + 1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" />
+                      <div className="absolute inset-0 bg-slate-900/0 group-hover:bg-slate-900/30 flex items-center justify-center transition-all opacity-0 group-hover:opacity-100">
+                        <span className="p-1.5 rounded-full bg-white/90 text-slate-800 shadow-sm">
+                          <ZoomIn className="w-3.5 h-3.5 text-emerald-700" />
+                        </span>
+                      </div>
                       <button
                         type="button"
-                        onClick={() => handleRemovePhoto(idx)}
-                        className="absolute top-1 right-1 p-1 bg-rose-600 text-white rounded-lg opacity-90 hover:opacity-100 transition-opacity shadow-sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemovePhoto(idx);
+                        }}
+                        className="absolute top-1 right-1 p-1 bg-rose-600 text-white rounded-lg opacity-90 hover:opacity-100 transition-opacity shadow-sm z-10"
                         title="Remove photo"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -551,6 +564,17 @@ export const NewMortgagePage: React.FC = () => {
           setValue('customer_id', created.id, { shouldValidate: true });
         }}
       />
+
+      {/* Photo Zoom Modal */}
+      {zoomedPhotoIndex !== null && collateralPhotos.length > 0 && (
+        <ImageZoomModal
+          isOpen={zoomedPhotoIndex !== null}
+          onClose={() => setZoomedPhotoIndex(null)}
+          images={collateralPhotos}
+          initialIndex={zoomedPhotoIndex}
+          title={language === 'bn' ? 'জামানতের ছবি প্রিভিউ' : 'Collateral Photo Preview'}
+        />
+      )}
     </div>
   );
 };
