@@ -229,6 +229,7 @@ export const RegisterForm: React.FC = () => {
                     type="password"
                     placeholder="••••••••"
                     autoComplete="new-password"
+                    showPasswordToggle={true}
                     {...register('password')}
                     error={errors.password?.message}
                   />
@@ -238,6 +239,7 @@ export const RegisterForm: React.FC = () => {
                     type="password"
                     placeholder="••••••••"
                     autoComplete="new-password"
+                    showPasswordToggle={true}
                     {...register('confirmPassword')}
                     error={errors.confirmPassword?.message}
                   />

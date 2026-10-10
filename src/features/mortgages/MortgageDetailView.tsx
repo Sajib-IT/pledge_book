@@ -12,7 +12,9 @@ import {
   formatDateDhaka,
   isMortgageOverdue,
   getDaysUntilDue,
-  calculateYearlyInterest,
+  calculateTermInterest,
+  calculateTermDuration,
+  toBanglaDigits,
   calculateEarlySettlement,
   calculateRenewWithDiscount,
   getTodayDhakaDateString,
@@ -100,7 +102,13 @@ export const MortgageDetailView: React.FC = () => {
   const { mortgage, payments } = data;
   const isOverdue = isMortgageOverdue(mortgage.due_date, mortgage.status);
   const daysUntilDue = getDaysUntilDue(mortgage.due_date);
-  const yearlyInterest = calculateYearlyInterest(mortgage.principal, mortgage.interest_rate);
+  const termCalc = calculateTermInterest(
+    mortgage.principal,
+    mortgage.interest_rate,
+    mortgage.start_date,
+    mortgage.due_date
+  );
+  const termDur = calculateTermDuration(mortgage.start_date, mortgage.due_date);
 
   // Early repayment calculation for Close Modal
   const earlySettlement = calculateEarlySettlement(
@@ -394,15 +402,15 @@ export const MortgageDetailView: React.FC = () => {
             <Card className="border-slate-200">
               <CardContent className="p-4">
                 <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">
-                  {t('mortgages.calculated_yearly_interest')}
+                  {language === 'bn' ? 'চুক্তিকৃত মেয়াদের সুদ' : 'Agreed Term Interest'}
                 </span>
                 <div className="text-xl sm:text-2xl font-black text-emerald-700 font-mono mt-1">
-                  {formatBDT(yearlyInterest, language)}
+                  {formatBDT(termCalc.termInterest, language)}
                 </div>
                 <span className="text-[11px] text-slate-400 mt-1 block">
                   {language === 'bn'
-                    ? `হার: ${mortgage.interest_rate}% বার্ষিক ফ্ল্যাট`
-                    : `Rate: ${mortgage.interest_rate}% yearly flat`}
+                    ? `মেয়াদ: ${termDur.termLabelBn} (${toBanglaDigits(termCalc.monthlyInterestRate)}% মাসিক)`
+                    : `Term: ${termDur.termLabelEn} (${termCalc.monthlyInterestRate}% / mo)`}
                 </span>
               </CardContent>
             </Card>
@@ -410,13 +418,13 @@ export const MortgageDetailView: React.FC = () => {
             <Card className="border-slate-200">
               <CardContent className="p-4">
                 <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">
-                  {language === 'bn' ? '১ বছরে মোট নিষ্পত্তি' : '1-Year Total Settlement'}
+                  {language === 'bn' ? 'মেয়াদান্তে মোট নিষ্পত্তি' : 'Maturity Settlement'}
                 </span>
                 <div className="text-xl sm:text-2xl font-black text-blue-900 font-mono mt-1">
-                  {formatBDT(mortgage.principal + yearlyInterest, language)}
+                  {formatBDT(termCalc.totalMaturity, language)}
                 </div>
                 <span className="text-[11px] text-slate-400 mt-1 block">
-                  {language === 'bn' ? 'আসল + ১ বছরের সুদ' : 'Principal + 1 year interest'}
+                  {language === 'bn' ? 'আসল + মেয়াদের চুক্তিভিত্তিক সুদ' : 'Principal + Agreed term interest'}
                 </span>
               </CardContent>
             </Card>

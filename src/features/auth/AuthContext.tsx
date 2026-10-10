@@ -21,6 +21,8 @@ interface AuthContextType {
   }) => Promise<{ success: boolean; error?: string; requiresEmailConfirmation?: boolean }>;
   logout: () => Promise<void>;
   switchDemoRole: (role: UserRole) => void;
+  sendPasswordResetEmail: (email: string) => Promise<{ success: boolean; error?: string }>;
+  updatePassword: (newPassword: string) => Promise<{ success: boolean; error?: string }>;
   isMockMode: boolean;
 }
 
@@ -254,6 +256,50 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.setItem('mock_user_role', role);
   };
 
+  const sendPasswordResetEmail = async (email: string): Promise<{ success: boolean; error?: string }> => {
+    if (isMockMode || !isSupabaseConfigured) {
+      // In mock mode, pretend email was sent successfully
+      return { success: true };
+    }
+
+    try {
+      const redirectUrl = `${window.location.origin}/reset-password`;
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: redirectUrl,
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      return { success: true };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to send password reset email';
+      return { success: false, error: msg };
+    }
+  };
+
+  const updatePassword = async (newPassword: string): Promise<{ success: boolean; error?: string }> => {
+    if (isMockMode || !isSupabaseConfigured) {
+      return { success: true };
+    }
+
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      return { success: true };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to update password';
+      return { success: false, error: msg };
+    }
+  };
+
   const role: UserRole = profile?.role ?? 'staff';
   const isOwner = role === 'owner';
 
@@ -270,6 +316,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         registerUser,
         logout,
         switchDemoRole,
+        sendPasswordResetEmail,
+        updatePassword,
         isMockMode,
       }}
     >

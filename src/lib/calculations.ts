@@ -294,3 +294,120 @@ export function formatDateDhaka(
     return dateStr;
   }
 }
+
+/**
+ * Calculates mortgage duration between start and due date.
+ */
+export function calculateTermDuration(
+  startDateStr: string,
+  dueDateStr: string
+): { days: number; months: number; termLabelBn: string; termLabelEn: string } {
+  if (!startDateStr || !dueDateStr) {
+    return { days: 365, months: 12, termLabelBn: '১ বছর (৩৬৫ দিন)', termLabelEn: '1 Year (365 days)' };
+  }
+  const start = new Date(startDateStr + 'T00:00:00+06:00');
+  const due = new Date(dueDateStr + 'T00:00:00+06:00');
+  const diffMs = due.getTime() - start.getTime();
+  const days = Math.max(1, Math.round(diffMs / (1000 * 60 * 60 * 24)));
+  const months = Math.max(1, Math.round(days / 30.4375));
+
+  let termLabelBn = '';
+  let termLabelEn = '';
+
+  if (days >= 355 && days <= 375) {
+    termLabelBn = '১ বছর (৩৬৫ দিন)';
+    termLabelEn = '1 Year (365 days)';
+  } else if (months >= 12 && months % 12 === 0) {
+    const years = months / 12;
+    termLabelBn = `${toBanglaDigits(years)} বছর (${toBanglaDigits(days)} দিন)`;
+    termLabelEn = `${years} Year${years > 1 ? 's' : ''} (${days} days)`;
+  } else if (days < 28) {
+    termLabelBn = `${toBanglaDigits(days)} দিন`;
+    termLabelEn = `${days} Days`;
+  } else {
+    termLabelBn = `${toBanglaDigits(months)} মাস (${toBanglaDigits(days)} দিন)`;
+    termLabelEn = `${months} Month${months > 1 ? 's' : ''} (${days} days)`;
+  }
+
+  return { days, months, termLabelBn, termLabelEn };
+}
+
+/**
+ * Converts monthly rate to annualized rate (e.g. 2% monthly -> 24% yearly).
+ */
+export function convertMonthlyToYearlyRate(monthlyRate: number): number {
+  return Number((Math.max(0, Number(monthlyRate) || 0) * 12).toFixed(2));
+}
+
+/**
+ * Converts yearly rate to monthly rate (e.g. 24% yearly -> 2% monthly).
+ */
+export function convertYearlyToMonthlyRate(yearlyRate: number): number {
+  return Number((Math.max(0, Number(yearlyRate) || 0) / 12).toFixed(2));
+}
+
+export interface TermCalculationResult {
+  principal: number;
+  yearlyInterestRate: number;
+  monthlyInterestRate: number;
+  days: number;
+  months: number;
+  monthlyInterest: number;
+  termInterest: number;
+  totalMaturity: number;
+}
+
+/**
+ * Calculates distinct per-customer mortgage calculation based on specific mortgage terms.
+ * Supports pro-rata term calculation or exact duration.
+ */
+export function calculateTermInterest(
+  principal: number,
+  yearlyInterestRate: number,
+  startDateStr: string,
+  dueDateStr: string
+): TermCalculationResult {
+  const numPrincipal = Number(principal) || 0;
+  const numYearlyRate = Number(yearlyInterestRate) || 0;
+  if (numPrincipal <= 0 || numYearlyRate <= 0) {
+    return {
+      principal: numPrincipal,
+      yearlyInterestRate: numYearlyRate,
+      monthlyInterestRate: convertYearlyToMonthlyRate(numYearlyRate),
+      days: 0,
+      months: 0,
+      monthlyInterest: 0,
+      termInterest: 0,
+      totalMaturity: numPrincipal,
+    };
+  }
+
+  const { days, months } = calculateTermDuration(startDateStr, dueDateStr);
+  const monthlyInterestRate = convertYearlyToMonthlyRate(numYearlyRate);
+
+  // Monthly interest amount: (principal * yearlyRate) / 100 / 12
+  const monthlyInterest = Math.round((numPrincipal * numYearlyRate) / 1200);
+
+  // Exact term interest based on duration:
+  let termInterest: number;
+  if (days >= 355 && days <= 375) {
+    termInterest = calculateYearlyInterest(numPrincipal, numYearlyRate);
+  } else {
+    // Pro-rata based on elapsed term days (day-based precision: 365 days)
+    termInterest = Math.round((numPrincipal * (numYearlyRate / 100) * days) / 365);
+  }
+
+  const totalMaturity = numPrincipal + termInterest;
+
+  return {
+    principal: numPrincipal,
+    yearlyInterestRate: numYearlyRate,
+    monthlyInterestRate,
+    days,
+    months,
+    monthlyInterest,
+    termInterest,
+    totalMaturity,
+  };
+}
+

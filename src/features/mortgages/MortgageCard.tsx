@@ -1,7 +1,15 @@
 import React from 'react';
 import type { Mortgage } from '../../types/database';
 import { useI18n } from '../../lib/i18n';
-import { formatBDT, formatDateDhaka, isMortgageOverdue, getDaysUntilDue, calculateYearlyInterest, toBanglaDigits } from '../../lib/calculations';
+import {
+  formatBDT,
+  formatDateDhaka,
+  isMortgageOverdue,
+  getDaysUntilDue,
+  calculateTermInterest,
+  calculateTermDuration,
+  toBanglaDigits,
+} from '../../lib/calculations';
 import { Card } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
 import {
@@ -32,7 +40,13 @@ export const MortgageCard: React.FC<{ mortgage: Mortgage }> = ({ mortgage }) => 
 
   const isOverdue = isMortgageOverdue(mortgage.due_date, mortgage.status);
   const daysUntilDue = getDaysUntilDue(mortgage.due_date);
-  const yearlyInterest = calculateYearlyInterest(mortgage.principal, mortgage.interest_rate);
+  const termCalc = calculateTermInterest(
+    mortgage.principal,
+    mortgage.interest_rate,
+    mortgage.start_date,
+    mortgage.due_date
+  );
+  const { termLabelBn, termLabelEn } = calculateTermDuration(mortgage.start_date, mortgage.due_date);
   const CollateralIcon = collateralIcons[mortgage.collateral_type] || HelpCircle;
 
   const handleClick = () => {
@@ -93,7 +107,7 @@ export const MortgageCard: React.FC<{ mortgage: Mortgage }> = ({ mortgage }) => 
             <span>{formatBDT(mortgage.principal, language)}</span>
           </div>
           <span className="text-[11px] text-emerald-700 font-semibold block">
-            +{formatBDT(yearlyInterest, language)} {language === 'bn' ? 'সুদ' : 'interest'} ({language === 'bn' ? toBanglaDigits(mortgage.interest_rate) : mortgage.interest_rate}%)
+            +{formatBDT(termCalc.termInterest, language)} {language === 'bn' ? 'সুদ' : 'interest'} ({language === 'bn' ? termLabelBn : termLabelEn})
           </span>
         </div>
       </div>

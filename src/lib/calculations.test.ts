@@ -9,6 +9,10 @@ import {
   calculateElapsedDuration,
   calculateEarlySettlement,
   calculateRenewWithDiscount,
+  calculateTermDuration,
+  calculateTermInterest,
+  convertMonthlyToYearlyRate,
+  convertYearlyToMonthlyRate,
   isMortgageOverdue,
   getDaysUntilDue,
   formatBDT,
@@ -167,3 +171,53 @@ describe('Bangla and BDT Formatting', () => {
     expect(formatBDT(-10000, 'bn')).toBe('-৳ ১০,০০০');
   });
 });
+
+describe('Distinct Customer Mortgage Terms and Calculations', () => {
+  it('converts between monthly and yearly interest rates', () => {
+    // 2% monthly = 24% yearly
+    expect(convertMonthlyToYearlyRate(2)).toBe(24);
+    // 2.5% monthly = 30% yearly
+    expect(convertMonthlyToYearlyRate(2.5)).toBe(30);
+    // 24% yearly = 2% monthly
+    expect(convertYearlyToMonthlyRate(24)).toBe(2);
+    // 30% yearly = 2.5% monthly
+    expect(convertYearlyToMonthlyRate(30)).toBe(2.5);
+  });
+
+  it('calculates term duration for various mortgage horizons', () => {
+    // 1 Month (~30 days)
+    const term1m = calculateTermDuration('2026-01-01', '2026-02-01');
+    expect(term1m.months).toBe(1);
+
+    // 3 Months (~90 days)
+    const term3m = calculateTermDuration('2026-01-01', '2026-04-01');
+    expect(term3m.months).toBe(3);
+    expect(term3m.days).toBe(90);
+
+    // 6 Months (~181 days)
+    const term6m = calculateTermDuration('2026-01-01', '2026-07-01');
+    expect(term6m.months).toBe(6);
+
+    // 1 Year (365 days)
+    const term1y = calculateTermDuration('2026-01-01', '2027-01-01');
+    expect(term1y.days).toBe(365);
+    expect(term1y.termLabelEn).toContain('1 Year');
+  });
+
+  it('calculates distinct term interest for 3-month loan: 50,000 principal at 24% yearly (2% monthly)', () => {
+    // 50,000 * 24% = 12,000/year => 1,000/month => 3 months (90 days) = 50,000 * 0.24 * 90 / 365 = 2959 BDT
+    const res = calculateTermInterest(50000, 24, '2026-01-01', '2026-04-01');
+    expect(res.principal).toBe(50000);
+    expect(res.monthlyInterestRate).toBe(2);
+    expect(res.monthlyInterest).toBe(1000); // 1,000 BDT per month
+    expect(res.termInterest).toBe(2959); // ~3,000 BDT
+    expect(res.totalMaturity).toBe(52959);
+  });
+
+  it('calculates distinct term interest for 1-year loan', () => {
+    const res = calculateTermInterest(50000, 25, '2026-01-01', '2027-01-01');
+    expect(res.termInterest).toBe(12500);
+    expect(res.totalMaturity).toBe(62500);
+  });
+});
+

@@ -8,6 +8,8 @@ import { PinLockOverlay } from './features/auth/PinLockOverlay';
 import { ProtectedRoute } from './features/auth/ProtectedRoute';
 import { LoginForm } from './features/auth/LoginForm';
 import { RegisterForm } from './features/auth/RegisterForm';
+import { ForgotPasswordPage } from './features/auth/ForgotPasswordPage';
+import { ResetPasswordPage } from './features/auth/ResetPasswordPage';
 import { Header } from './components/common/Header';
 import { BottomNav } from './components/common/BottomNav';
 import { OfflineBanner } from './components/common/OfflineBanner';
@@ -66,6 +68,8 @@ export const App: React.FC = () => {
               {/* Public Auth Routes */}
               <Route path="/login" element={<LoginForm />} />
               <Route path="/register" element={<RegisterForm />} />
+              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+              <Route path="/reset-password" element={<ResetPasswordPage />} />
 
               {/* Protected App Routes */}
               <Route

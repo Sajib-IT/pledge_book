@@ -64,13 +64,15 @@ const INITIAL_MOCK_CUSTOMERS: Customer[] = [
 let mockCustomersStore = [...INITIAL_MOCK_CUSTOMERS];
 
 export const useCustomers = (searchQuery: string = '') => {
-  const { isMockMode } = useAuth();
+  const { isMockMode, user } = useAuth();
 
   return useQuery({
-    queryKey: ['customers', searchQuery, isMockMode],
+    queryKey: ['customers', searchQuery, isMockMode, user?.id],
     queryFn: async (): Promise<Customer[]> => {
+      const currentUserId = user?.id;
+
       if (isMockMode || !isSupabaseConfigured) {
-        let list = [...mockCustomersStore];
+        let list = mockCustomersStore.filter((c) => !currentUserId || c.created_by === currentUserId);
         if (searchQuery.trim()) {
           const q = searchQuery.toLowerCase().trim();
           list = list.filter(
@@ -83,9 +85,12 @@ export const useCustomers = (searchQuery: string = '') => {
         return list;
       }
 
+      if (!currentUserId) return [];
+
       let query = supabase
         .from('customers')
         .select('*')
+        .eq('created_by', currentUserId)
         .order('created_at', { ascending: false });
 
       if (searchQuery.trim()) {
@@ -160,12 +165,16 @@ export const useCreateCustomer = () => {
 
 export const useUpdateCustomer = () => {
   const queryClient = useQueryClient();
-  const { isMockMode } = useAuth();
+  const { isMockMode, user } = useAuth();
 
   return useMutation({
     mutationFn: async ({ id, ...input }: CustomerInput & { id: string }): Promise<Customer> => {
+      const currentUserId = user?.id;
+
       if (isMockMode || !isSupabaseConfigured) {
-        const idx = mockCustomersStore.findIndex((c) => c.id === id);
+        const idx = mockCustomersStore.findIndex(
+          (c) => c.id === id && (!currentUserId || c.created_by === currentUserId)
+        );
         if (idx >= 0) {
           mockCustomersStore[idx] = {
             ...mockCustomersStore[idx],
@@ -180,6 +189,8 @@ export const useUpdateCustomer = () => {
         throw new Error('Customer not found');
       }
 
+      if (!currentUserId) throw new Error('Not authenticated');
+
       const { data, error } = await supabase
         .from('customers')
         .update({
@@ -193,6 +204,7 @@ export const useUpdateCustomer = () => {
           updated_at: new Date().toISOString(),
         })
         .eq('id', id)
+        .eq('created_by', currentUserId)
         .select()
         .single();
 
@@ -207,16 +219,26 @@ export const useUpdateCustomer = () => {
 
 export const useDeleteCustomer = () => {
   const queryClient = useQueryClient();
-  const { isMockMode } = useAuth();
+  const { isMockMode, user } = useAuth();
 
   return useMutation({
     mutationFn: async (id: string): Promise<void> => {
+      const currentUserId = user?.id;
+
       if (isMockMode || !isSupabaseConfigured) {
-        mockCustomersStore = mockCustomersStore.filter((c) => c.id !== id);
+        mockCustomersStore = mockCustomersStore.filter(
+          (c) => !(c.id === id && (!currentUserId || c.created_by === currentUserId))
+        );
         return;
       }
 
-      const { error } = await supabase.from('customers').delete().eq('id', id);
+      if (!currentUserId) throw new Error('Not authenticated');
+
+      const { error } = await supabase
+        .from('customers')
+        .delete()
+        .eq('id', id)
+        .eq('created_by', currentUserId);
       if (error) throw error;
     },
     onSuccess: () => {

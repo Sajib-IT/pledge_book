@@ -7,11 +7,14 @@ import { useCreateMortgage } from './useMortgages';
 import { CustomerFormDialog } from '../customers/CustomerFormDialog';
 import { useI18n } from '../../lib/i18n';
 import {
-  calculateYearlyInterest,
-  calculateCloseAmount,
+  calculateTermDuration,
+  calculateTermInterest,
+  convertMonthlyToYearlyRate,
+  convertYearlyToMonthlyRate,
   formatBDT,
   getTodayDhakaDateString,
   parseBanglaOrEnglishNumber,
+  toBanglaDigits,
 } from '../../lib/calculations';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -27,6 +30,8 @@ import {
   Trash2,
   Search,
   ZoomIn,
+  Clock,
+  Calculator,
 } from 'lucide-react';
 import { ImageZoomModal } from '../../components/ui/image-zoom-modal';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
@@ -58,6 +63,15 @@ const mortgageSchema = z.object({
 
 type MortgageFormData = z.infer<typeof mortgageSchema>;
 
+const TERM_PRESETS = [
+  { id: '1m', months: 1, labelBn: '১ মাস', labelEn: '1 Month' },
+  { id: '2m', months: 2, labelBn: '২ মাস', labelEn: '2 Months' },
+  { id: '3m', months: 3, labelBn: '৩ মাস', labelEn: '3 Months' },
+  { id: '6m', months: 6, labelBn: '৬ মাস', labelEn: '6 Months' },
+  { id: '1y', months: 12, labelBn: '১ বছর', labelEn: '1 Year' },
+  { id: 'custom', months: 0, labelBn: 'কাস্টম তারিখ', labelEn: 'Custom Date' },
+];
+
 export const NewMortgagePage: React.FC = () => {
   const { language, t } = useI18n();
   const navigate = useNavigate();
@@ -80,7 +94,10 @@ export const NewMortgagePage: React.FC = () => {
   const defaultRate = Number(localStorage.getItem('default_interest_rate') || '25.00');
 
   const [principalInput, setPrincipalInput] = useState<string>('');
+  const [rateBasis, setRateBasis] = useState<'yearly' | 'monthly'>('yearly');
+  const [selectedTermPreset, setSelectedTermPreset] = useState<string>('1y');
   const [interestRateInput, setInterestRateInput] = useState<string>(() => defaultRate.toString());
+  const [monthlyRateInput, setMonthlyRateInput] = useState<string>(() => (defaultRate / 12).toFixed(2));
 
   const {
     register,
@@ -113,18 +130,32 @@ export const NewMortgagePage: React.FC = () => {
   const watchedPrincipal = Number(rawPrincipal) || 0;
   const watchedRate = Number(rawRate) || 0;
   const watchedStartDate = watch('start_date');
+  const watchedDueDate = watch('due_date') || nextYearStr;
 
-  // Automatically sync due_date to +1 year when start_date changes
+  // Sync due_date when start_date changes or term preset changes
   useEffect(() => {
-    if (watchedStartDate) {
-      const d = new Date(watchedStartDate);
-      d.setFullYear(d.getFullYear() + 1);
-      setValue('due_date', d.toISOString().split('T')[0]);
+    if (watchedStartDate && selectedTermPreset !== 'custom') {
+      const preset = TERM_PRESETS.find((p) => p.id === selectedTermPreset);
+      if (preset && preset.months > 0) {
+        const d = new Date(watchedStartDate);
+        d.setMonth(d.getMonth() + preset.months);
+        setValue('due_date', d.toISOString().split('T')[0]);
+      }
     }
-  }, [watchedStartDate, setValue]);
+  }, [watchedStartDate, selectedTermPreset, setValue]);
 
-  const yearlyInterest = calculateYearlyInterest(watchedPrincipal, watchedRate);
-  const settlement = calculateCloseAmount(watchedPrincipal, watchedRate);
+  const handleSelectTerm = (presetId: string, months: number) => {
+    setSelectedTermPreset(presetId);
+    if (months > 0) {
+      const baseDate = new Date(watchedStartDate || todayStr);
+      baseDate.setMonth(baseDate.getMonth() + months);
+      setValue('due_date', baseDate.toISOString().split('T')[0], { shouldValidate: true });
+    }
+  };
+
+  // Distinct calculation based on chosen customer mortgage terms
+  const termCalculation = calculateTermInterest(watchedPrincipal, watchedRate, watchedStartDate, watchedDueDate);
+  const termDuration = calculateTermDuration(watchedStartDate, watchedDueDate);
 
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
@@ -309,12 +340,18 @@ export const NewMortgagePage: React.FC = () => {
         {/* 2. Financial Details & Real-Time Calculation Preview */}
         <Card className="border-slate-200">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base font-bold flex items-center gap-2">
-              <Coins className="w-4 h-4 text-emerald-600" />
-              <span>{t('mortgages.financial_title')}</span>
+            <CardTitle className="text-base font-bold flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Coins className="w-4 h-4 text-emerald-600" />
+                <span>{t('mortgages.financial_title')}</span>
+              </div>
+              <span className="text-xs font-semibold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+                {language === 'bn' ? 'স্বতন্ত্র হিসাব ও মেয়াদ' : 'Custom Client Terms'}
+              </span>
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-5">
+            {/* Principal & Interest Rate */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input
                 label={t('mortgages.principal')}
@@ -332,56 +369,121 @@ export const NewMortgagePage: React.FC = () => {
                 helperText={t('mortgages.principal_helper')}
               />
 
-              <Input
-                label={t('mortgages.interest_rate')}
-                type="text"
-                inputMode="decimal"
-                placeholder="25.00"
-                value={interestRateInput}
-                onChange={(e) => {
-                  const raw = e.target.value;
-                  setInterestRateInput(raw);
-                  const parsed = parseBanglaOrEnglishNumber(raw);
-                  setValue('interest_rate', parsed, { shouldValidate: true });
-                }}
-                error={errors.interest_rate?.message}
-                helperText={t('mortgages.interest_helper')}
-              />
-            </div>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-slate-700">
+                    {t('mortgages.interest_rate')}
+                  </label>
+                  {/* Rate Basis Toggle */}
+                  <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-[11px]">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRateBasis('yearly');
+                        const parsed = parseBanglaOrEnglishNumber(interestRateInput);
+                        setValue('interest_rate', parsed, { shouldValidate: true });
+                      }}
+                      className={`px-2 py-0.5 rounded-md font-semibold transition-all ${
+                        rateBasis === 'yearly'
+                          ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                          : 'text-slate-500 hover:text-slate-900'
+                      }`}
+                    >
+                      {language === 'bn' ? 'বাৎসরিক %' : 'Yearly %'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRateBasis('monthly');
+                        const parsed = parseBanglaOrEnglishNumber(monthlyRateInput);
+                        const annualized = convertMonthlyToYearlyRate(parsed);
+                        setValue('interest_rate', annualized, { shouldValidate: true });
+                      }}
+                      className={`px-2 py-0.5 rounded-md font-semibold transition-all ${
+                        rateBasis === 'monthly'
+                          ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                          : 'text-slate-500 hover:text-slate-900'
+                      }`}
+                    >
+                      {language === 'bn' ? 'মাসিক %' : 'Monthly %'}
+                    </button>
+                  </div>
+                </div>
 
-            {/* Live Calculation Preview Banner */}
-            <div className="p-4 rounded-2xl bg-gradient-to-tr from-emerald-50 via-teal-50/40 to-slate-50 border border-emerald-200/80">
-              <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider block mb-2">
-                🧮 {language === 'en' ? 'Live Interest & Settlement Preview (1-Year Term)' : 'লাইভ সুদের হিসাব প্রিভিউ (১ বছর মেয়াদ)'}
-              </span>
-              <div className="grid grid-cols-3 gap-2 text-center sm:text-left">
-                <div className="bg-white/80 p-2.5 rounded-xl border border-emerald-100">
-                  <span className="text-[11px] text-slate-500 block">{t('mortgages.principal')}</span>
-                  <span className="text-sm sm:text-base font-bold text-slate-900 font-mono">
-                    {formatBDT(watchedPrincipal, language)}
-                  </span>
-                </div>
-                <div className="bg-white/80 p-2.5 rounded-xl border border-emerald-100">
-                  <span className="text-[11px] text-slate-500 block">
-                    {language === 'en' ? `1-Yr Interest (${watchedRate}%)` : `১ বছরের সুদ (${watchedRate}%)`}
-                  </span>
-                  <span className="text-sm sm:text-base font-bold text-emerald-700 font-mono">
-                    {formatBDT(yearlyInterest, language)}
-                  </span>
-                </div>
-                <div className="bg-white/80 p-2.5 rounded-xl border border-emerald-100">
-                  <span className="text-[11px] text-slate-500 block">
-                    {language === 'en' ? 'Total Settlement' : 'পরিশোধে মোট দেওয়'}
-                  </span>
-                  <span className="text-sm sm:text-base font-bold text-slate-900 font-mono">
-                    {formatBDT(settlement.total, language)}
-                  </span>
-                </div>
+                {rateBasis === 'yearly' ? (
+                  <Input
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="25.00"
+                    value={interestRateInput}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      setInterestRateInput(raw);
+                      const parsed = parseBanglaOrEnglishNumber(raw);
+                      setValue('interest_rate', parsed, { shouldValidate: true });
+                      setMonthlyRateInput(convertYearlyToMonthlyRate(parsed).toString());
+                    }}
+                    error={errors.interest_rate?.message}
+                    helperText={
+                      language === 'bn'
+                        ? `মাসিক সমতুল্য: ${toBanglaDigits(convertYearlyToMonthlyRate(watchedRate).toFixed(2))}% প্রতি মাস`
+                        : `Monthly equivalent: ${convertYearlyToMonthlyRate(watchedRate).toFixed(2)}% / month`
+                    }
+                  />
+                ) : (
+                  <Input
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="2.00"
+                    value={monthlyRateInput}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      setMonthlyRateInput(raw);
+                      const parsed = parseBanglaOrEnglishNumber(raw);
+                      const annualized = convertMonthlyToYearlyRate(parsed);
+                      setInterestRateInput(annualized.toString());
+                      setValue('interest_rate', annualized, { shouldValidate: true });
+                    }}
+                    error={errors.interest_rate?.message}
+                    helperText={
+                      language === 'bn'
+                        ? `বাৎসরিক সমতুল্য: ${toBanglaDigits(watchedRate.toFixed(2))}% প্রতি বছর`
+                        : `Annualized rate: ${watchedRate.toFixed(2)}% / year`
+                    }
+                  />
+                )}
               </div>
             </div>
 
-            {/* Dates */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+            {/* Agreed Term Selection Presets */}
+            <div className="space-y-2 pt-1">
+              <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-slate-700">
+                <Clock className="w-3.5 h-3.5 text-emerald-600" />
+                <span>{language === 'bn' ? 'গ্রাহকের সাথে চুক্তিকৃত মেয়াদ' : 'Agreed Customer Term'}</span>
+              </label>
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                {TERM_PRESETS.map((preset) => {
+                  const isSelected = selectedTermPreset === preset.id;
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => handleSelectTerm(preset.id, preset.months)}
+                      className={`h-9 px-2 text-xs font-bold rounded-xl border transition-all text-center flex items-center justify-center ${
+                        isSelected
+                          ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                          : 'bg-white text-slate-700 border-slate-200 hover:border-emerald-300 hover:bg-slate-50'
+                      }`}
+                    >
+                      {language === 'bn' ? preset.labelBn : preset.labelEn}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Dates Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input
                 label={t('mortgages.start_date')}
                 type="date"
@@ -393,9 +495,95 @@ export const NewMortgagePage: React.FC = () => {
                 label={t('mortgages.due_date')}
                 type="date"
                 {...register('due_date')}
+                onChange={(e) => {
+                  setSelectedTermPreset('custom');
+                  setValue('due_date', e.target.value, { shouldValidate: true });
+                }}
                 error={errors.due_date?.message}
-                helperText={language === 'en' ? 'Auto-extended by 1 year from start date' : 'শুরুর তারিখ থেকে ১ বছর স্বয়ংক্রিয়ভাবে যুক্ত'}
+                helperText={
+                  language === 'bn'
+                    ? `মেয়াদকাল: ${termDuration.termLabelBn}`
+                    : `Duration: ${termDuration.termLabelEn}`
+                }
               />
+            </div>
+
+            {/* Live Distinct Calculation Preview Banner */}
+            <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-tr from-emerald-50 via-teal-50/40 to-slate-50 border border-emerald-200/90 shadow-2xs space-y-3">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <span className="text-xs font-black text-emerald-900 tracking-tight flex items-center gap-1.5">
+                  <Calculator className="w-4 h-4 text-emerald-700" />
+                  <span>
+                    {language === 'bn'
+                      ? 'স্বতন্ত্র গ্রাহক হিসাব ও মেয়াদ বিবরণী'
+                      : 'Distinct Customer Calculation & Term Breakdown'}
+                  </span>
+                </span>
+                <span className="text-[11px] font-bold text-emerald-700 bg-white px-2.5 py-0.5 rounded-lg border border-emerald-200">
+                  {language === 'bn' ? termDuration.termLabelBn : termDuration.termLabelEn}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                <div className="bg-white/95 p-3 rounded-xl border border-emerald-100 shadow-2xs">
+                  <span className="text-[11px] text-slate-500 font-medium block">
+                    {t('mortgages.principal')}
+                  </span>
+                  <span className="text-sm sm:text-base font-black text-slate-900 font-mono">
+                    {formatBDT(watchedPrincipal, language)}
+                  </span>
+                </div>
+
+                <div className="bg-white/95 p-3 rounded-xl border border-emerald-100 shadow-2xs">
+                  <span className="text-[11px] text-slate-500 font-medium block">
+                    {language === 'bn' ? 'সুদের হার' : 'Interest Rate'}
+                  </span>
+                  <span className="text-sm sm:text-base font-bold text-emerald-700 font-mono">
+                    {language === 'bn'
+                      ? `${toBanglaDigits(termCalculation.monthlyInterestRate)}% মাসিক`
+                      : `${termCalculation.monthlyInterestRate}% / mo`}
+                  </span>
+                  <span className="text-[10px] text-slate-400 block">
+                    ({language === 'bn' ? `${toBanglaDigits(watchedRate)}% বাৎসরিক` : `${watchedRate}% / yr`})
+                  </span>
+                </div>
+
+                <div className="bg-white/95 p-3 rounded-xl border border-emerald-100 shadow-2xs">
+                  <span className="text-[11px] text-slate-500 font-medium block">
+                    {language === 'bn' ? 'মাসিক সুদ' : 'Monthly Interest'}
+                  </span>
+                  <span className="text-sm sm:text-base font-bold text-slate-800 font-mono">
+                    {formatBDT(termCalculation.monthlyInterest, language)}
+                  </span>
+                  <span className="text-[10px] text-slate-400 block">
+                    {language === 'bn' ? 'প্রতি মাসে প্রদেয়' : 'Per month'}
+                  </span>
+                </div>
+
+                <div className="bg-white/95 p-3 rounded-xl border border-emerald-200 shadow-2xs bg-emerald-50/30">
+                  <span className="text-[11px] text-emerald-800 font-semibold block">
+                    {language === 'bn' ? 'মেয়াদের মোট সুদ' : 'Agreed Term Interest'}
+                  </span>
+                  <span className="text-sm sm:text-base font-black text-emerald-700 font-mono">
+                    {formatBDT(termCalculation.termInterest, language)}
+                  </span>
+                  <span className="text-[10px] text-emerald-600 font-medium block">
+                    {language === 'bn' ? `মোট ${termDuration.termLabelBn}` : `For ${termDuration.termLabelEn}`}
+                  </span>
+                </div>
+
+                <div className="bg-white/95 p-3 rounded-xl border border-blue-200 shadow-2xs bg-blue-50/30 col-span-2 sm:col-span-2">
+                  <span className="text-[11px] text-blue-900 font-semibold block">
+                    {language === 'bn' ? 'মেয়াদান্তে মোট প্রদেয় (আসল + সুদ)' : 'Total Maturity Settlement (Principal + Interest)'}
+                  </span>
+                  <span className="text-base sm:text-lg font-black text-blue-900 font-mono">
+                    {formatBDT(termCalculation.totalMaturity, language)}
+                  </span>
+                  <span className="text-[10px] text-blue-700 font-medium block">
+                    {language === 'bn' ? 'চুক্তির মেয়াদ শেষে সম্পূর্ণ নিষ্পত্তি' : 'Full settlement at contract maturity'}
+                  </span>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>

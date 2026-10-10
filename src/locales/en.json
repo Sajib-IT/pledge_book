@@ -60,7 +60,21 @@
     "go_to_register": "Register Now",
     "passwords_do_not_match": "Passwords do not match",
     "reg_success_verify": "Registration successful! Please check your email to verify your account or sign in.",
-    "reg_success": "Registration successful! Redirecting..."
+    "reg_success": "Registration successful! Redirecting...",
+    "forgot_password": "Forgot Password?",
+    "forgot_password_title": "Password Recovery",
+    "forgot_password_subtitle": "Enter your account email to receive a password reset link",
+    "send_reset_link": "Send Reset Link",
+    "sending_reset_link": "Sending link...",
+    "reset_link_sent": "Password reset link sent! Please check your email inbox and click the recovery link.",
+    "reset_password_title": "Set New Password",
+    "reset_password_subtitle": "Enter a new secure password for your account",
+    "new_password": "New Password",
+    "new_password_placeholder": "At least 6 characters",
+    "update_password_btn": "Update Password",
+    "updating_password": "Updating password...",
+    "password_updated_success": "Password updated successfully! You can now sign in.",
+    "back_to_login": "Back to Sign In"
   },
   "nav": {
     "dashboard": "Dashboard",

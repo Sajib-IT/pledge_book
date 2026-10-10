@@ -7,7 +7,8 @@ import { calculateYearlyInterest } from '../../lib/calculations';
 import { scheduleMortgageNotifications, cancelMortgageNotifications } from '../../lib/notifications';
 
 // Realistic mock store for offline/demo development matching seed.sql
-let mockMortgagesStore: Mortgage[] = [
+// Realistic mock store for offline/demo development matching seed.sql
+export let mockMortgagesStore: Mortgage[] = [
   {
     id: '20000000-0000-0000-0000-000000000001',
     mortgage_no: 'MTG-202510-1001',
@@ -134,7 +135,7 @@ let mockMortgagesStore: Mortgage[] = [
   },
 ];
 
-let mockPaymentsStore: Payment[] = [
+export let mockPaymentsStore: Payment[] = [
   {
     id: '30000000-0000-0000-0000-000000000001',
     receipt_no: 'REC-202510-5001',
@@ -170,13 +171,15 @@ export interface MortgagesFilter {
 }
 
 export const useMortgages = (filters?: MortgagesFilter) => {
-  const { isMockMode } = useAuth();
+  const { isMockMode, user } = useAuth();
 
   return useQuery({
-    queryKey: ['mortgages', filters, isMockMode],
+    queryKey: ['mortgages', filters, isMockMode, user?.id],
     queryFn: async (): Promise<Mortgage[]> => {
+      const currentUserId = user?.id;
+
       if (isMockMode || !isSupabaseConfigured) {
-        let list = [...mockMortgagesStore];
+        let list = mockMortgagesStore.filter((m) => !currentUserId || m.created_by === currentUserId);
         const todayStr = new Date().toISOString().split('T')[0];
 
         if (filters?.status && filters.status !== 'all') {
@@ -201,9 +204,12 @@ export const useMortgages = (filters?: MortgagesFilter) => {
         return list.sort((a, b) => b.created_at.localeCompare(a.created_at));
       }
 
+      if (!currentUserId) return [];
+
       let query = supabase
         .from('mortgages')
         .select('*, customer:customers(*)')
+        .eq('created_by', currentUserId)
         .order('created_at', { ascending: false });
 
       if (filters?.status && filters.status !== 'all') {
@@ -223,16 +229,19 @@ export const useMortgages = (filters?: MortgagesFilter) => {
 };
 
 export const useMortgageDetail = (mortgageId: string | undefined) => {
-  const { isMockMode } = useAuth();
+  const { isMockMode, user } = useAuth();
 
   return useQuery({
-    queryKey: ['mortgage', mortgageId, isMockMode],
+    queryKey: ['mortgage', mortgageId, isMockMode, user?.id],
     enabled: Boolean(mortgageId),
     queryFn: async (): Promise<{ mortgage: Mortgage; payments: Payment[] }> => {
       if (!mortgageId) throw new Error('Mortgage ID is required');
+      const currentUserId = user?.id;
 
       if (isMockMode || !isSupabaseConfigured) {
-        const mortgage = mockMortgagesStore.find((m) => m.id === mortgageId);
+        const mortgage = mockMortgagesStore.find(
+          (m) => m.id === mortgageId && (!currentUserId || m.created_by === currentUserId)
+        );
         if (!mortgage) throw new Error('Mortgage not found');
         const payments = mockPaymentsStore
           .filter((p) => p.mortgage_id === mortgageId)
@@ -240,12 +249,17 @@ export const useMortgageDetail = (mortgageId: string | undefined) => {
         return { mortgage, payments };
       }
 
-      // Live Supabase query
+      if (!currentUserId) throw new Error('Not authenticated');
+
+      // Live Supabase query scoped by user
       const { data: mortgage, error: mtgErr } = await supabase
         .from('mortgages')
         .select('*, customer:customers(*)')
         .eq('id', mortgageId)
+        .eq('created_by', currentUserId)
         .single();
+
+      if (mtgErr) throw mtgErr;
 
       if (mtgErr) throw mtgErr;
 
@@ -349,7 +363,10 @@ export const useRenewMortgage = () => {
       amount?: number;
     }) => {
       if (isMockMode || !isSupabaseConfigured) {
-        const mtgIndex = mockMortgagesStore.findIndex((m) => m.id === mortgageId);
+        const currentUserId = user?.id;
+        const mtgIndex = mockMortgagesStore.findIndex(
+          (m) => m.id === mortgageId && (!currentUserId || m.created_by === currentUserId)
+        );
         if (mtgIndex === -1) throw new Error('Mortgage not found');
 
         const mtg = mockMortgagesStore[mtgIndex];
@@ -438,7 +455,10 @@ export const useCloseMortgage = () => {
       amount?: number;
     }) => {
       if (isMockMode || !isSupabaseConfigured) {
-        const mtgIndex = mockMortgagesStore.findIndex((m) => m.id === mortgageId);
+        const currentUserId = user?.id;
+        const mtgIndex = mockMortgagesStore.findIndex(
+          (m) => m.id === mortgageId && (!currentUserId || m.created_by === currentUserId)
+        );
         if (mtgIndex === -1) throw new Error('Mortgage not found');
 
         const mtg = mockMortgagesStore[mtgIndex];
@@ -519,9 +539,15 @@ export const useAddCorrection = () => {
       reason: string;
     }) => {
       if (isMockMode || !isSupabaseConfigured) {
+        const currentUserId = user?.id;
         const origPayment = mockPaymentsStore.find((p) => p.id === paymentId);
         if (!origPayment) throw new Error('Payment not found');
         if (origPayment.type === 'correction') throw new Error('Cannot reverse a correction entry');
+
+        const parentMtg = mockMortgagesStore.find((m) => m.id === origPayment.mortgage_id);
+        if (!parentMtg || (currentUserId && parentMtg.created_by !== currentUserId)) {
+          throw new Error('Unauthorized to reverse this payment');
+        }
 
         const alreadyCorrected = mockPaymentsStore.some((p) => p.original_payment_id === paymentId);
         if (alreadyCorrected) throw new Error('Payment already reversed');

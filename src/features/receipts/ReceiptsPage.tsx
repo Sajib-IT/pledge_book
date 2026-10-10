@@ -15,23 +15,40 @@ import { EmptyState } from '../../components/common/EmptyState';
 import type { Payment, Mortgage } from '../../types/database';
 import { Search, Printer, Calendar, FileText, ArrowUpRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { mockMortgagesStore, mockPaymentsStore } from '../mortgages/useMortgages';
 
 export const ReceiptsPage: React.FC = () => {
-  const { isMockMode } = useAuth();
+  const { isMockMode, user } = useAuth();
   const { language, t } = useI18n();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedReceipt, setSelectedReceipt] = useState<{ payment: Payment; mortgage: Mortgage } | null>(null);
 
   const { data: allReceipts = [], isLoading, isError, error, refetch } = useQuery({
-    queryKey: ['receipts_list', isMockMode],
+    queryKey: ['receipts_list', isMockMode, user?.id],
     queryFn: async (): Promise<Array<{ payment: Payment; mortgage: Mortgage }>> => {
+      const currentUserId = user?.id;
+
       if (isMockMode || !isSupabaseConfigured) {
-        return [];
+        const userMortgages = mockMortgagesStore.filter(
+          (m) => !currentUserId || m.created_by === currentUserId
+        );
+        const userMortgageMap = new Map(userMortgages.map((m) => [m.id, m]));
+
+        return mockPaymentsStore
+          .filter((p) => userMortgageMap.has(p.mortgage_id))
+          .map((p) => ({
+            payment: p,
+            mortgage: userMortgageMap.get(p.mortgage_id)!,
+          }))
+          .sort((a, b) => b.payment.paid_on.localeCompare(a.payment.paid_on));
       }
+
+      if (!currentUserId) return [];
 
       const { data, error: payErr } = await supabase
         .from('payments')
-        .select('*, mortgage:mortgages(*, customer:customers(*))')
+        .select('*, mortgage:mortgages!inner(*, customer:customers(*))')
+        .eq('mortgage.created_by', currentUserId)
         .order('paid_on', { ascending: false });
 
       if (payErr) throw payErr;

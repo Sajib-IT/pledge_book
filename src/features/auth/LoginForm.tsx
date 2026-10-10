@@ -110,14 +110,27 @@ export const LoginForm: React.FC = () => {
                 error={errors.email?.message}
               />
 
-              <Input
-                label={t('auth.password')}
-                type="password"
-                placeholder="••••••••"
-                autoComplete="current-password"
-                {...register('password')}
-                error={errors.password?.message}
-              />
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
+                    {t('auth.password')}
+                  </label>
+                  <Link
+                    to="/forgot-password"
+                    className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 hover:underline transition-colors"
+                  >
+                    {t('auth.forgot_password')}
+                  </Link>
+                </div>
+                <Input
+                  type="password"
+                  placeholder="••••••••"
+                  autoComplete="current-password"
+                  showPasswordToggle={true}
+                  {...register('password')}
+                  error={errors.password?.message}
+                />
+              </div>
 
               <Button
                 type="submit"

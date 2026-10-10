@@ -3,18 +3,19 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import type { DashboardStats } from '../../types/database';
 import { useAuth } from '../auth/AuthContext';
-import { useMortgages } from '../mortgages/useMortgages';
+import { useMortgages, mockPaymentsStore, mockMortgagesStore } from '../mortgages/useMortgages';
 import { calculateYearlyInterest } from '../../lib/calculations';
 
 export const useDashboardStats = () => {
-  const { isMockMode } = useAuth();
+  const { isMockMode, user } = useAuth();
   const { data: mortgages = [] } = useMortgages();
 
   return useQuery({
-    queryKey: ['dashboard_stats', isMockMode, mortgages.length],
+    queryKey: ['dashboard_stats', isMockMode, user?.id, mortgages.length],
     queryFn: async (): Promise<DashboardStats> => {
       if (isMockMode || !isSupabaseConfigured) {
-        // Compute dynamically from in-memory mortgages and payments
+        // Compute dynamically from in-memory mortgages and payments for this user
+        const currentUserId = user?.id;
         const today = new Date().toISOString().split('T')[0];
 
         const active = mortgages.filter((m) => m.status === 'active');
@@ -30,22 +31,38 @@ export const useDashboardStats = () => {
           0
         );
 
+        const userMortgageIds = new Set(
+          mockMortgagesStore
+            .filter((m) => !currentUserId || m.created_by === currentUserId)
+            .map((m) => m.id)
+        );
+        const userPayments = mockPaymentsStore.filter((p) => userMortgageIds.has(p.mortgage_id));
+        const currentMonth = today.slice(0, 7);
+        const currentYear = today.slice(0, 4);
+        const incomeThisMonth = userPayments
+          .filter((p) => p.paid_on.startsWith(currentMonth))
+          .reduce((sum, p) => sum + p.amount, 0);
+        const incomeThisYear = userPayments
+          .filter((p) => p.paid_on.startsWith(currentYear))
+          .reduce((sum, p) => sum + p.amount, 0);
+
         return {
           total_outstanding_principal: totalPrincipal,
           active_mortgages_count: active.length,
           expected_interest_this_month: expectedInterestMonth,
           overdue_count: overdue.length,
           due_within_15_days_count: due15.length,
-          income_this_month: 24000,
-          income_this_year: 61500,
+          income_this_month: incomeThisMonth,
+          income_this_year: incomeThisYear,
           calculated_at: new Date().toISOString(),
         };
       }
 
-      // Live Supabase RPC call: dashboard_stats()
+      // Live Supabase RPC call: dashboard_stats() (user scoped in Postgres)
       const { data, error } = await supabase.rpc('dashboard_stats');
       if (error) throw error;
       return data as DashboardStats;
     },
   });
 };
+
