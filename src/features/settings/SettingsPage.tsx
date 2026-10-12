@@ -7,6 +7,7 @@ import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import {
   Globe,
+  Calendar,
   Store,
   LogOut,
   Check,
@@ -28,6 +29,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import type { Profile } from '../../types/database';
+import { formatDateDhaka, getTodayDhakaDateString } from '../../lib/calculations';
 import { useMortgages } from '../mortgages/useMortgages';
 import {
   checkNotificationPermission,
@@ -63,6 +65,8 @@ export const SettingsPage: React.FC = () => {
   // PIN lock state
   const [newPin, setNewPin] = useState('');
   const [pinSuccess, setPinSuccess] = useState(false);
+
+  const todayStr = getTodayDhakaDateString();
 
   // Mortgages data for notification sync
   const { data: mortgages = [] } = useMortgages();
@@ -403,6 +407,42 @@ export const SettingsPage: React.FC = () => {
               <span>{t('settings.language_en')}</span>
               {language === 'en' && <Check className="w-4 h-4 text-emerald-600" />}
             </button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Date Format Preference */}
+      {/* Date Format Standard */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Calendar className="w-5 h-5 text-emerald-600" />
+            <CardTitle>
+              {language === 'bn' ? 'তারিখের ফরম্যাট (Date Format)' : 'Date Format'}
+            </CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-xs text-slate-500">
+            {language === 'bn'
+              ? 'অ্যাপ্লিকেশনে সকল ফর্ম, ডেট পিকার, রসিদ ও তালিকায় একক স্ট্যান্ডার্ড দিন/মাস/বছর (DD/MM/YYYY) ফরম্যাট নির্ধারিত।'
+              : 'The single standard date format across all forms, date pickers, receipts, and lists is set to DD/MM/YYYY.'}
+          </p>
+
+          <div className="p-4 rounded-xl border border-emerald-300 bg-emerald-50/70 flex items-center justify-between">
+            <div>
+              <div className="text-sm font-bold text-emerald-950">
+                {language === 'bn' ? 'দিন/মাস/বছর (DD/MM/YYYY)' : 'Date/Month/Year (DD/MM/YYYY)'}
+              </div>
+              <div className="text-xs text-emerald-700 font-mono mt-0.5">
+                {language === 'bn' ? 'আজকের তারিখ উদাহরণ:' : "Today's date example:"}{' '}
+                <span className="font-bold">{formatDateDhaka(todayStr, language)}</span>
+              </div>
+            </div>
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-600 text-white shadow-xs">
+              <Check className="w-3.5 h-3.5" />
+              <span>{language === 'bn' ? 'কার্যকর স্ট্যান্ডার্ড' : 'Standard'}</span>
+            </span>
           </div>
         </CardContent>
       </Card>

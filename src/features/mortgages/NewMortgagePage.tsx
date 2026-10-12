@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useCustomers } from '../customers/useCustomers';
+import { useCustomers, useCreateCustomer } from '../customers/useCustomers';
 import { useCreateMortgage } from './useMortgages';
 import { CustomerFormDialog } from '../customers/CustomerFormDialog';
 import { useI18n } from '../../lib/i18n';
@@ -18,10 +18,12 @@ import {
 } from '../../lib/calculations';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
+import { DatePicker } from '../../components/ui/date-picker';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/card';
 import {
   ArrowLeft,
   UserPlus,
+  User,
   Coins,
   Camera,
   Image as ImageIcon,
@@ -43,23 +45,55 @@ import {
 } from '../../lib/imageCompressor';
 import type { CollateralType } from '../../types/database';
 
-const mortgageSchema = z.object({
-  customer_id: z.string().min(1, 'গ্রাহক নির্বাচন করুন'),
-  principal: z.preprocess(
-    (val) => parseBanglaOrEnglishNumber(val as string | number),
-    z.number({ required_error: 'আসল টাকা লিখুন', invalid_type_error: 'আসল টাকা সঠিকভাবে লিখুন' })
-      .min(100, 'আসল টাকা কমপক্ষে ১০০ হতে হবে')
-  ),
-  interest_rate: z.preprocess(
-    (val) => parseBanglaOrEnglishNumber(val as string | number),
-    z.number({ required_error: 'সুদের হার লিখুন', invalid_type_error: 'সুদের হার সঠিকভাবে লিখুন' })
-      .min(0, 'সুদের হার ০ বা তার বেশি হতে হবে')
-  ),
-  start_date: z.string().min(1, 'শুরুর তারিখ দিন'),
-  due_date: z.string().min(1, 'মেয়াদ উত্তীর্ণের তারিখ দিন'),
-  collateral_type: z.enum(['gold', 'land', 'vehicle', 'electronics', 'other']),
-  collateral_description: z.string().min(3, 'জামানতের বিবরণ দিন'),
-});
+const mortgageSchema = z
+  .object({
+    customer_mode: z.enum(['new', 'existing']),
+    customer_id: z.string().optional(),
+    customer_name: z.string().optional(),
+    customer_phone: z.string().optional(),
+    customer_address: z.string().optional(),
+    customer_nid: z.string().optional(),
+    principal: z.preprocess(
+      (val) => parseBanglaOrEnglishNumber(val as string | number),
+      z.number({ required_error: 'আসল টাকা লিখুন', invalid_type_error: 'আসল টাকা সঠিকভাবে লিখুন' })
+        .min(100, 'আসল টাকা কমপক্ষে ১০০ হতে হবে')
+    ),
+    interest_rate: z.preprocess(
+      (val) => parseBanglaOrEnglishNumber(val as string | number),
+      z.number({ required_error: 'সুদের হার লিখুন', invalid_type_error: 'সুদের হার সঠিকভাবে লিখুন' })
+        .min(0, 'সুদের হার ০ বা তার বেশি হতে হবে')
+    ),
+    start_date: z.string().min(1, 'শুরুর তারিখ দিন'),
+    due_date: z.string().min(1, 'মেয়াদ উত্তীর্ণের তারিখ দিন'),
+    collateral_type: z.enum(['gold', 'land', 'vehicle', 'electronics', 'other']),
+    collateral_description: z.string().min(3, 'জামানতের বিবরণ দিন'),
+  })
+  .superRefine((data, ctx) => {
+    if (data.customer_mode === 'existing') {
+      if (!data.customer_id || data.customer_id.trim() === '') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'গ্রাহক নির্বাচন করুন',
+          path: ['customer_id'],
+        });
+      }
+    } else {
+      if (!data.customer_name || data.customer_name.trim().length < 2) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'গ্রাহকের নাম লিখুন (কমপক্ষে ২ অক্ষর)',
+          path: ['customer_name'],
+        });
+      }
+      if (!data.customer_phone || data.customer_phone.trim().length < 6) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'মোবাইল নম্বর লিখুন',
+          path: ['customer_phone'],
+        });
+      }
+    }
+  });
 
 type MortgageFormData = z.infer<typeof mortgageSchema>;
 
@@ -79,8 +113,12 @@ export const NewMortgagePage: React.FC = () => {
   const preselectedCustomerId = searchParams.get('customer_id');
 
   const { data: customers = [] } = useCustomers();
+  const createCustomerMutation = useCreateCustomer();
   const createMortgageMutation = useCreateMortgage();
 
+  const [customerMode, setCustomerMode] = useState<'new' | 'existing'>(() =>
+    preselectedCustomerId ? 'existing' : 'new'
+  );
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
   const [collateralPhotos, setCollateralPhotos] = useState<string[]>([]);
   const [customerSearch, setCustomerSearch] = useState('');
@@ -108,7 +146,12 @@ export const NewMortgagePage: React.FC = () => {
   } = useForm<MortgageFormData>({
     resolver: zodResolver(mortgageSchema) as any,
     defaultValues: {
+      customer_mode: preselectedCustomerId ? 'existing' : 'new',
       customer_id: preselectedCustomerId || '',
+      customer_name: '',
+      customer_phone: '',
+      customer_address: '',
+      customer_nid: '',
       principal: 0,
       interest_rate: defaultRate,
       start_date: todayStr,
@@ -120,6 +163,8 @@ export const NewMortgagePage: React.FC = () => {
 
   useEffect(() => {
     if (preselectedCustomerId) {
+      setCustomerMode('existing');
+      setValue('customer_mode', 'existing');
       setValue('customer_id', preselectedCustomerId);
     }
   }, [preselectedCustomerId, setValue]);
@@ -206,7 +251,20 @@ export const NewMortgagePage: React.FC = () => {
 
   const onSubmit = async (data: MortgageFormData) => {
     try {
-      const selectedCustomer = customers.find((c) => c.id === data.customer_id);
+      let finalCustomerId = data.customer_id;
+      let finalCustomer = customers.find((c) => c.id === data.customer_id);
+
+      // If in new customer mode, create customer inline first
+      if (data.customer_mode === 'new') {
+        const createdCustomer = await createCustomerMutation.mutateAsync({
+          name: data.customer_name!.trim(),
+          phone: data.customer_phone!.trim(),
+          address: data.customer_address?.trim() || undefined,
+          nid_no: data.customer_nid?.trim() || undefined,
+        });
+        finalCustomerId = createdCustomer.id;
+        finalCustomer = createdCustomer;
+      }
 
       // Ensure all collateral photos are compressed to lightweight sizes (<100KB)
       const compressedPhotos = await Promise.all(
@@ -219,7 +277,7 @@ export const NewMortgagePage: React.FC = () => {
       );
 
       const created = await createMortgageMutation.mutateAsync({
-        customer_id: data.customer_id,
+        customer_id: finalCustomerId!,
         principal: Math.round(data.principal),
         interest_rate: data.interest_rate,
         start_date: data.start_date,
@@ -227,13 +285,14 @@ export const NewMortgagePage: React.FC = () => {
         collateral_type: data.collateral_type as CollateralType,
         collateral_description: data.collateral_description,
         collateral_photo_paths: compressedPhotos,
-        customer: selectedCustomer,
+        customer: finalCustomer,
       });
 
       navigate(`/mortgages/${created.id}`);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Failed to create mortgage:', err);
-      alert('বন্ধক তৈরি করতে সমস্যা হয়েছে। অনুগ্রহ করে তথ্য পুনরায় যাচাই করুন।');
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      alert((language === 'bn' ? 'বন্ধক তৈরি করতে সমস্যা হয়েছে: ' : 'Failed to create mortgage: ') + msg);
     }
   };
 
@@ -255,43 +314,97 @@ export const NewMortgagePage: React.FC = () => {
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-        {/* 1. Customer Selection */}
+        {/* 1. Customer Information (Inline New Customer or Existing Select) */}
         <Card className="border-slate-200">
           <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <CardTitle className="text-base font-bold flex items-center gap-2">
-                <span>{t('mortgages.customer_select_title')}</span>
+                <User className="w-4 h-4 text-emerald-600" />
+                <span>{language === 'bn' ? '১. গ্রাহকের তথ্য' : '1. Customer Information'}</span>
               </CardTitle>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="gap-1.5 text-xs text-emerald-700 border-emerald-300 hover:bg-emerald-50"
-                onClick={() => setIsCustomerModalOpen(true)}
-              >
-                <UserPlus className="w-3.5 h-3.5" />
-                <span>{t('customers.add_customer')}</span>
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {customers.length === 0 ? (
-              <div className="p-4 rounded-xl border border-dashed border-emerald-300 bg-emerald-50/50 text-center space-y-2.5">
-                <p className="text-xs sm:text-sm text-slate-700 font-medium">
-                  {language === 'bn'
-                    ? 'কোনো গ্রাহক পাওয়া যায়নি। বন্ধক তৈরি করতে প্রথমে গ্রাহক যোগ করুন।'
-                    : 'No customers found. Please add a customer first to issue a mortgage.'}
-                </p>
-                <Button
+
+              {/* Mode Toggle Switch */}
+              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 self-start sm:self-auto">
+                <button
                   type="button"
-                  size="sm"
-                  variant="primary"
-                  className="gap-1.5 mx-auto"
-                  onClick={() => setIsCustomerModalOpen(true)}
+                  onClick={() => {
+                    setCustomerMode('new');
+                    setValue('customer_mode', 'new', { shouldValidate: true });
+                  }}
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                    customerMode === 'new'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
                 >
                   <UserPlus className="w-3.5 h-3.5" />
-                  <span>{t('customers.add_customer')}</span>
-                </Button>
+                  <span>{language === 'bn' ? 'নতুন গ্রাহক (সরাসরি)' : 'New Customer (Direct)'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCustomerMode('existing');
+                    setValue('customer_mode', 'existing', { shouldValidate: true });
+                  }}
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                    customerMode === 'existing'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Search className="w-3.5 h-3.5" />
+                  <span>{language === 'bn' ? 'পুরাতন গ্রাহক থেকে বাছুন' : 'Select Existing'}</span>
+                </button>
+              </div>
+            </div>
+          </CardHeader>
+
+          <CardContent className="space-y-3">
+            {customerMode === 'new' ? (
+              <div className="space-y-3 bg-emerald-50/50 p-4 rounded-2xl border border-emerald-200/70">
+                <div className="flex items-center justify-between text-xs text-emerald-800 font-semibold mb-1">
+                  <span>
+                    {language === 'bn'
+                      ? '💡 সরাসরি নতুন গ্রাহকের তথ্য লিখুন (আলাদা সেভ করতে হবে না, নিচে একসাথেই সেভ হবে):'
+                      : '💡 Enter customer details directly below (will be saved automatically with mortgage):'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <Input
+                    label={language === 'bn' ? 'গ্রাহকের পুরো নাম *' : 'Customer Full Name *'}
+                    placeholder={language === 'bn' ? 'যেমন: হাজী রফিক মিয়া' : 'e.g. Rafiq Mia'}
+                    {...register('customer_name')}
+                    error={errors.customer_name?.message}
+                    className="bg-white"
+                  />
+
+                  <Input
+                    label={language === 'bn' ? 'মোবাইল নম্বর *' : 'Phone Number *'}
+                    placeholder={language === 'bn' ? 'যেমন: ০১৭১১২২৩৩৪৪' : 'e.g. 01711223344'}
+                    type="tel"
+                    {...register('customer_phone')}
+                    error={errors.customer_phone?.message}
+                    className="bg-white font-mono"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <Input
+                    label={language === 'bn' ? 'ঠিকানা (ঐচ্ছিক)' : 'Address (Optional)'}
+                    placeholder={language === 'bn' ? 'গ্রাম/মহল্লা, থানা, জেলা' : 'Village/Street, City'}
+                    {...register('customer_address')}
+                    className="bg-white"
+                  />
+
+                  <Input
+                    label={language === 'bn' ? 'জাতীয় পরিচয়পত্র (NID - ঐচ্ছিক)' : 'NID No (Optional)'}
+                    placeholder={language === 'bn' ? 'যেমন: ১৯৮৫২৬৯১২৩৪৫৬৭৮৯০' : 'e.g. 19852691234567890'}
+                    {...register('customer_nid')}
+                    className="bg-white font-mono"
+                  />
+                </div>
               </div>
             ) : (
               <div className="space-y-2">
@@ -329,10 +442,10 @@ export const NewMortgagePage: React.FC = () => {
                       </option>
                     ))}
                 </select>
+                {errors.customer_id && (
+                  <p className="text-xs font-medium text-rose-600 mt-1">{errors.customer_id.message}</p>
+                )}
               </div>
-            )}
-            {errors.customer_id && (
-              <p className="text-xs font-medium text-rose-600 mt-1">{errors.customer_id.message}</p>
             )}
           </CardContent>
         </Card>
@@ -484,20 +597,19 @@ export const NewMortgagePage: React.FC = () => {
 
             {/* Dates Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Input
+              <DatePicker
                 label={t('mortgages.start_date')}
-                type="date"
-                {...register('start_date')}
+                value={watchedStartDate}
+                onChange={(val) => setValue('start_date', val, { shouldValidate: true })}
                 error={errors.start_date?.message}
               />
 
-              <Input
+              <DatePicker
                 label={t('mortgages.due_date')}
-                type="date"
-                {...register('due_date')}
-                onChange={(e) => {
+                value={watchedDueDate}
+                onChange={(val) => {
                   setSelectedTermPreset('custom');
-                  setValue('due_date', e.target.value, { shouldValidate: true });
+                  setValue('due_date', val, { shouldValidate: true });
                 }}
                 error={errors.due_date?.message}
                 helperText={

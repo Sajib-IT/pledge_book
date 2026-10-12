@@ -1,11 +1,15 @@
 import React, { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   useMortgageDetail,
   useRenewMortgage,
   useCloseMortgage,
   useAddCorrection,
+  useDeleteMortgage,
 } from './useMortgages';
+import { useAuth } from '../auth/AuthContext';
+import { CapitalizeInterestDialog } from './CapitalizeInterestDialog';
+import { MortgageEditDialog } from './MortgageEditDialog';
 import { useI18n } from '../../lib/i18n';
 import {
   formatBDT,
@@ -25,6 +29,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/ca
 import { Badge } from '../../components/ui/badge';
 import { Dialog } from '../../components/ui/dialog';
 import { Input } from '../../components/ui/input';
+import { DatePicker } from '../../components/ui/date-picker';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import type { Payment } from '../../types/database';
 import {
@@ -42,6 +47,9 @@ import {
   Printer,
   Tag,
   ZoomIn,
+  TrendingUp,
+  Edit2,
+  Trash2,
 } from 'lucide-react';
 import { ReceiptModal } from '../receipts/ReceiptModal';
 import { ImageZoomModal } from '../../components/ui/image-zoom-modal';
@@ -49,15 +57,20 @@ import { ImageZoomModal } from '../../components/ui/image-zoom-modal';
 export const MortgageDetailView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { language, t } = useI18n();
+  const { isOwner } = useAuth();
+  const navigate = useNavigate();
 
   const { data, isLoading, isError, error, refetch } = useMortgageDetail(id);
   const renewMutation = useRenewMortgage();
   const closeMutation = useCloseMortgage();
   const correctionMutation = useAddCorrection();
+  const deleteMortgageMutation = useDeleteMortgage();
 
   // Modals state
   const [isRenewModalOpen, setIsRenewModalOpen] = useState(false);
   const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
+  const [isCapitalizeModalOpen, setIsCapitalizeModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [correctionTargetPayment, setCorrectionTargetPayment] = useState<Payment | null>(null);
 
   // Form states for modals
@@ -244,6 +257,23 @@ export const MortgageDetailView: React.FC = () => {
     }
   };
 
+  const handleDeleteMortgage = async () => {
+    const confirmMsg =
+      language === 'bn'
+        ? `আপনি কি নিশ্চিতভাবে এই বন্ধকটি মুছে ফেলতে চান? বন্ধক নং: ${mortgage.mortgage_no}। এর সাথে সম্পর্কিত সকল পেমেন্ট তথ্যও মুছে যাবে।`
+        : `Are you sure you want to delete mortgage ${mortgage.mortgage_no}? All related payments will also be permanently deleted.`;
+
+    if (window.confirm(confirmMsg)) {
+      try {
+        await deleteMortgageMutation.mutateAsync(mortgage.id);
+        navigate('/mortgages', { replace: true });
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Failed to delete mortgage';
+        alert(language === 'bn' ? `বন্ধক মুছে ফেলা সম্ভব হয়নি: ${msg}` : `Failed to delete mortgage: ${msg}`);
+      }
+    }
+  };
+
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-24 md:pb-12">
       {/* Top Bar with Back & Status */}
@@ -283,37 +313,82 @@ export const MortgageDetailView: React.FC = () => {
           </div>
         </div>
 
-        {/* Quick Action Buttons for Active Mortgages */}
-        {mortgage.status === 'active' && (
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setPaymentDate(getTodayDhakaDateString());
-                setIsRenewModalOpen(true);
-              }}
-              className="gap-1.5 border-blue-200 text-blue-700 hover:bg-blue-50 font-bold"
-            >
-              <RotateCw className="w-4 h-4 text-blue-600" />
-              <span>{t('mortgages.renew_btn')}</span>
-            </Button>
-            <Button
-              type="button"
-              variant="primary"
-              size="sm"
-              onClick={() => {
-                setPaymentDate(getTodayDhakaDateString());
-                setIsCloseModalOpen(true);
-              }}
-              className="gap-1.5 shadow-md shadow-emerald-700/20 font-bold"
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>{t('mortgages.close_btn')}</span>
-            </Button>
-          </div>
-        )}
+        {/* Quick Action Buttons for Active Mortgages & Owner Controls */}
+        <div className="flex flex-wrap items-center gap-2">
+          {mortgage.status === 'active' && (
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setPaymentDate(getTodayDhakaDateString());
+                  setIsRenewModalOpen(true);
+                }}
+                className="gap-1.5 border-blue-200 text-blue-700 hover:bg-blue-50 font-bold"
+              >
+                <RotateCw className="w-4 h-4 text-blue-600" />
+                <span>{t('mortgages.renew_btn')}</span>
+              </Button>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsCapitalizeModalOpen(true)}
+                className="gap-1.5 border-amber-300 text-amber-800 bg-amber-50/70 hover:bg-amber-100 font-bold"
+                title={language === 'bn' ? 'বকেয়া সুদ আসলের সাথে যোগ বা আসল বৃদ্ধি' : 'Capitalize interest into principal'}
+              >
+                <TrendingUp className="w-4 h-4 text-amber-600" />
+                <span>{language === 'bn' ? 'সুদ আসলে যোগ' : 'Add to Principal'}</span>
+              </Button>
+
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                onClick={() => {
+                  setPaymentDate(getTodayDhakaDateString());
+                  setIsCloseModalOpen(true);
+                }}
+                className="gap-1.5 shadow-md shadow-emerald-700/20 font-bold"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>{t('mortgages.close_btn')}</span>
+              </Button>
+            </>
+          )}
+
+          {/* Owner Only Edit & Delete Actions */}
+          {isOwner && (
+            <div className="flex items-center gap-1.5 border-l border-slate-200 pl-2 ml-1">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsEditModalOpen(true)}
+                className="gap-1.5 text-slate-700 hover:bg-slate-100 font-bold"
+                title={language === 'bn' ? 'মালিক সম্পাদনা' : 'Owner Edit'}
+              >
+                <Edit2 className="w-3.5 h-3.5 text-slate-600" />
+                <span>{t('common.edit')}</span>
+              </Button>
+
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={handleDeleteMortgage}
+                disabled={deleteMortgageMutation.isPending}
+                className="gap-1.5 text-rose-600 hover:text-rose-700 hover:bg-rose-50 font-bold"
+                title={language === 'bn' ? 'মালিক মুছে ফেলুন' : 'Owner Delete'}
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>{t('common.delete')}</span>
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Success Receipt Alert */}
@@ -719,11 +794,10 @@ export const MortgageDetailView: React.FC = () => {
             />
           </div>
 
-          <Input
+          <DatePicker
             label={t('payments.paid_on')}
-            type="date"
             value={paymentDate}
-            onChange={(e) => setPaymentDate(e.target.value)}
+            onChange={(val) => setPaymentDate(val)}
           />
 
           <Input
@@ -931,11 +1005,10 @@ export const MortgageDetailView: React.FC = () => {
             </div>
           </div>
 
-          <Input
+          <DatePicker
             label={t('payments.paid_on')}
-            type="date"
             value={paymentDate}
-            onChange={(e) => setPaymentDate(e.target.value)}
+            onChange={(val) => setPaymentDate(val)}
           />
 
           <Input
@@ -1047,6 +1120,28 @@ export const MortgageDetailView: React.FC = () => {
               ? `জামানতের ছবি (${mortgage.mortgage_no})`
               : `Collateral Photo (${mortgage.mortgage_no})`
           }
+        />
+      )}
+
+      {/* CAPITALIZE INTEREST DIALOG */}
+      <CapitalizeInterestDialog
+        mortgage={mortgage}
+        isOpen={isCapitalizeModalOpen}
+        onClose={() => setIsCapitalizeModalOpen(false)}
+        onSuccess={() => {
+          refetch();
+        }}
+      />
+
+      {/* OWNER EDIT MORTGAGE DIALOG */}
+      {isOwner && (
+        <MortgageEditDialog
+          mortgage={mortgage}
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          onSuccess={() => {
+            refetch();
+          }}
         />
       )}
     </div>

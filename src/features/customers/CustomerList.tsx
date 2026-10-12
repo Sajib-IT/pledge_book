@@ -42,16 +42,17 @@ export const CustomerList: React.FC = () => {
     e?.stopPropagation();
     const confirmMsg =
       language === 'bn'
-        ? `আপনি কি নিশ্চিতভাবে "${customer.name}" কে মুছে ফেলতে চান?`
-        : `Are you sure you want to delete customer "${customer.name}"?`;
+        ? `আপনি কি নিশ্চিতভাবে "${customer.name}" কে মুছে ফেলতে চান? গ্রাহকের সাথে সম্পর্কিত সকল বন্ধক ও লেনদেনের তথ্যও মুছে যাবে।`
+        : `Are you sure you want to delete customer "${customer.name}"? All associated mortgages and records will also be deleted.`;
     if (window.confirm(confirmMsg)) {
       try {
         await deleteMutation.mutateAsync(customer.id);
-      } catch {
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Unknown error';
         alert(
           language === 'bn'
-            ? 'গ্রাহক মোছা সম্ভব হয়নি। তার সক্রিয় বন্ধক বা লেনদেন থাকতে পারে।'
-            : 'Could not delete customer. They may have active mortgages or transaction history.'
+            ? `গ্রাহক মোছা সম্ভব হয়নি: ${msg}`
+            : `Could not delete customer: ${msg}`
         );
       }
     }
@@ -218,6 +219,7 @@ export const CustomerList: React.FC = () => {
         isOpen={Boolean(selectedCustomer)}
         onClose={() => setSelectedCustomer(null)}
         onEdit={(cust) => handleEdit(cust)}
+        onDelete={(cust) => handleDelete(cust)}
       />
     </div>
   );

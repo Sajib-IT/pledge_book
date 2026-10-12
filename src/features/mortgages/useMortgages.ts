@@ -1,7 +1,7 @@
 // src/features/mortgages/useMortgages.ts
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
-import type { Mortgage, Payment, CollateralType } from '../../types/database';
+import type { Mortgage, Payment, CollateralType, MortgageStatus } from '../../types/database';
 import { useAuth } from '../auth/AuthContext';
 import { calculateYearlyInterest } from '../../lib/calculations';
 import { scheduleMortgageNotifications, cancelMortgageNotifications } from '../../lib/notifications';
@@ -161,6 +161,11 @@ export let mockPaymentsStore: Payment[] = [
     created_at: new Date(Date.now() - 15 * 86400000).toISOString(),
   },
 ];
+
+export function clearMockMortgagesStore() {
+  mockMortgagesStore = [];
+  mockPaymentsStore = [];
+}
 
 let receiptCounter = 5003;
 let mortgageCounter = 1005;
@@ -612,3 +617,204 @@ export const useAddCorrection = () => {
     },
   });
 };
+
+export interface MortgageUpdateInput {
+  id: string;
+  principal?: number;
+  interest_rate?: number;
+  start_date?: string;
+  due_date?: string;
+  collateral_type?: CollateralType;
+  collateral_description?: string;
+  collateral_photo_paths?: string[];
+  status?: MortgageStatus;
+}
+
+export const useUpdateMortgage = () => {
+  const queryClient = useQueryClient();
+  const { isMockMode, user } = useAuth();
+
+  return useMutation({
+    mutationFn: async ({ id, ...input }: MortgageUpdateInput): Promise<Mortgage> => {
+      const currentUserId = user?.id;
+
+      if (isMockMode || !isSupabaseConfigured) {
+        const idx = mockMortgagesStore.findIndex(
+          (m) => m.id === id && (!currentUserId || m.created_by === currentUserId)
+        );
+        if (idx === -1) throw new Error('Mortgage not found');
+
+        const updated: Mortgage = {
+          ...mockMortgagesStore[idx],
+          ...input,
+          updated_at: new Date().toISOString(),
+        };
+        mockMortgagesStore[idx] = updated;
+        return updated;
+      }
+
+      if (!currentUserId) throw new Error('Not authenticated');
+
+      const { data, error } = await supabase
+        .from('mortgages')
+        .update({
+          ...input,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id)
+        .eq('created_by', currentUserId)
+        .select(`
+          *,
+          customer:customers(*)
+        `)
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['mortgage', data.id] });
+      queryClient.invalidateQueries({ queryKey: ['mortgages'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard_stats'] });
+    },
+  });
+};
+
+export const useDeleteMortgage = () => {
+  const queryClient = useQueryClient();
+  const { isMockMode, user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (mortgageId: string): Promise<void> => {
+      const currentUserId = user?.id;
+
+      if (isMockMode || !isSupabaseConfigured) {
+        mockPaymentsStore = mockPaymentsStore.filter((p) => p.mortgage_id !== mortgageId);
+        mockMortgagesStore = mockMortgagesStore.filter((m) => m.id !== mortgageId);
+        cancelMortgageNotifications(mortgageId);
+        return;
+      }
+
+      if (!currentUserId) throw new Error('Not authenticated');
+
+      // Attempt cascade RPC first
+      const { error: rpcError } = await supabase.rpc('delete_mortgage', {
+        p_mortgage_id: mortgageId,
+      });
+
+      if (rpcError) {
+        // Fallback: delete related payments first, then mortgage
+        const { error: payError } = await supabase
+          .from('payments')
+          .delete()
+          .eq('mortgage_id', mortgageId);
+        if (payError) console.warn('Payments delete warning:', payError.message);
+
+        const { error: delError } = await supabase
+          .from('mortgages')
+          .delete()
+          .eq('id', mortgageId);
+        if (delError) throw delError;
+      }
+
+      cancelMortgageNotifications(mortgageId);
+    },
+    onSuccess: (_, mortgageId) => {
+      queryClient.invalidateQueries({ queryKey: ['mortgages'] });
+      queryClient.invalidateQueries({ queryKey: ['mortgage', mortgageId] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard_stats'] });
+      queryClient.invalidateQueries({ queryKey: ['due_list'] });
+      queryClient.invalidateQueries({ queryKey: ['receipts'] });
+    },
+  });
+};
+
+export interface CapitalizeInterestInput {
+  mortgageId: string;
+  addedAmount: number;
+  newDueDate?: string;
+  note?: string;
+}
+
+export const useCapitalizeInterest = () => {
+  const queryClient = useQueryClient();
+  const { isMockMode, user } = useAuth();
+
+  return useMutation({
+    mutationFn: async ({
+      mortgageId,
+      addedAmount,
+      newDueDate,
+      note,
+    }: CapitalizeInterestInput): Promise<{ newPrincipal: number }> => {
+      const currentUserId = user?.id;
+      const safeAdded = Math.round(Number(addedAmount) || 0);
+      if (safeAdded <= 0) throw new Error('Added amount must be greater than zero');
+
+      if (isMockMode || !isSupabaseConfigured) {
+        const idx = mockMortgagesStore.findIndex(
+          (m) => m.id === mortgageId && (!currentUserId || m.created_by === currentUserId)
+        );
+        if (idx === -1) throw new Error('Mortgage not found');
+
+        const currentMtg = mockMortgagesStore[idx];
+        const newPrincipal = currentMtg.principal + safeAdded;
+        const now = new Date().toISOString();
+
+        mockMortgagesStore[idx] = {
+          ...currentMtg,
+          principal: newPrincipal,
+          due_date: newDueDate || currentMtg.due_date,
+          collateral_description: note
+            ? `${currentMtg.collateral_description} | [আসল বৃদ্ধি: +৳${safeAdded} (${note})]`
+            : currentMtg.collateral_description,
+          updated_at: now,
+        };
+
+        return { newPrincipal };
+      }
+
+      if (!currentUserId) throw new Error('Not authenticated');
+
+      // Fetch current principal
+      const { data: mtg, error: fetchErr } = await supabase
+        .from('mortgages')
+        .select('principal, collateral_description')
+        .eq('id', mortgageId)
+        .eq('created_by', currentUserId)
+        .single();
+
+      if (fetchErr || !mtg) throw fetchErr || new Error('Mortgage not found');
+
+      const newPrincipal = Number(mtg.principal) + safeAdded;
+      const updatePayload: Record<string, unknown> = {
+        principal: newPrincipal,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (newDueDate) {
+        updatePayload.due_date = newDueDate;
+      }
+
+      if (note) {
+        updatePayload.collateral_description = `${mtg.collateral_description} | [আসল বৃদ্ধি: +৳${safeAdded} (${note})]`;
+      }
+
+      const { error: updateErr } = await supabase
+        .from('mortgages')
+        .update(updatePayload)
+        .eq('id', mortgageId)
+        .eq('created_by', currentUserId);
+
+      if (updateErr) throw updateErr;
+
+      return { newPrincipal };
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['mortgage', variables.mortgageId] });
+      queryClient.invalidateQueries({ queryKey: ['mortgages'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard_stats'] });
+    },
+  });
+};
+

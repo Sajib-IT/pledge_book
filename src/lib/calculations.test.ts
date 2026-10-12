@@ -17,6 +17,9 @@ import {
   getDaysUntilDue,
   formatBDT,
   toBanglaDigits,
+  formatDateDhaka,
+  formatDateToDMY,
+  parseDMYToISO,
 } from './calculations';
 
 describe('Mortgage Financial Calculations', () => {
@@ -220,4 +223,30 @@ describe('Distinct Customer Mortgage Terms and Calculations', () => {
     expect(res.totalMaturity).toBe(62500);
   });
 });
+
+describe('Date Formatting Logic (Single format: date/month/year)', () => {
+  const sampleDate = '2026-10-12';
+
+  it('formats dates strictly as date/month/year (12/10/2026 for en, ১২/১০/২০২৬ for bn)', () => {
+    const enFormatted = formatDateDhaka(sampleDate, 'en');
+    expect(enFormatted).toBe('12/10/2026');
+
+    const bnFormatted = formatDateDhaka(sampleDate, 'bn');
+    expect(bnFormatted).toBe('১২/১০/২০২৬');
+  });
+
+  it('converts ISO YYYY-MM-DD to DD/MM/YYYY via formatDateToDMY', () => {
+    expect(formatDateToDMY('2026-10-12')).toBe('12/10/2026');
+    expect(formatDateToDMY('2024-05-01')).toBe('01/05/2024');
+  });
+
+  it('parses DD/MM/YYYY, DD-MM-YYYY, and Bangla digits to ISO YYYY-MM-DD via parseDMYToISO', () => {
+    expect(parseDMYToISO('12/10/2026')).toBe('2026-10-12');
+    expect(parseDMYToISO('১২/১০/২০২৬')).toBe('2026-10-12');
+    expect(parseDMYToISO('05-04-2025')).toBe('2025-04-05');
+    expect(parseDMYToISO('5/4/2025')).toBe('2025-04-05');
+    expect(parseDMYToISO('invalid')).toBeNull();
+  });
+});
+
 

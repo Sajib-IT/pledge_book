@@ -269,12 +269,18 @@ export function formatBDT(amount: number | string, locale: 'bn' | 'en' = 'bn'): 
   return isNegative ? `-৳ ${result}` : `৳ ${result}`;
 }
 
+export type DateDisplayFormat = 'slash'; // Standard single format: date/month/year (DD/MM/YYYY)
+
 /**
  * Format date string into human friendly format in Asia/Dhaka.
+ * Strictly uses date/month/year (DD/MM/YYYY) across the entire application:
+ * - English: 12/10/2026
+ * - Bengali: ১২/১০/২০২৬
  */
 export function formatDateDhaka(
   dateStr: string | null | undefined,
-  locale: 'bn' | 'en' = 'bn'
+  locale: 'bn' | 'en' = 'bn',
+  _preferredFormat?: string
 ): string {
   if (!dateStr) return '-';
   try {
@@ -283,16 +289,53 @@ export function formatDateDhaka(
 
     const options: Intl.DateTimeFormatOptions = {
       timeZone: 'Asia/Dhaka',
+      day: '2-digit',
+      month: '2-digit',
       year: 'numeric',
-      month: 'short',
-      day: 'numeric',
     };
 
-    const formatted = new Intl.DateTimeFormat(locale === 'bn' ? 'bn-BD' : 'en-US', options).format(date);
-    return formatted;
+    return new Intl.DateTimeFormat(locale === 'bn' ? 'bn-BD' : 'en-GB', options).format(date);
   } catch {
     return dateStr;
   }
+}
+
+/**
+ * Formats an ISO string (YYYY-MM-DD) directly into DD/MM/YYYY.
+ */
+export function formatDateToDMY(isoDateStr: string | null | undefined): string {
+  if (!isoDateStr) return '';
+  const clean = isoDateStr.split('T')[0];
+  const parts = clean.split('-');
+  if (parts.length === 3) {
+    const [y, m, d] = parts;
+    return `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`;
+  }
+  return isoDateStr;
+}
+
+/**
+ * Parses user input in DD/MM/YYYY (or DD-MM-YYYY / Bangla digits) into standard ISO YYYY-MM-DD.
+ */
+export function parseDMYToISO(dmyStr: string | null | undefined): string | null {
+  if (!dmyStr) return null;
+  const cleaned = toEnglishDigits(dmyStr).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(cleaned)) {
+    return cleaned;
+  }
+  const parts = cleaned.split(/[\/\-\.]/);
+  if (parts.length !== 3) return null;
+  const day = parseInt(parts[0], 10);
+  const month = parseInt(parts[1], 10);
+  let year = parseInt(parts[2], 10);
+  if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
+  if (year < 100) year += 2000;
+  if (month < 1 || month > 12) return null;
+  if (day < 1 || day > 31) return null;
+  const dStr = String(day).padStart(2, '0');
+  const mStr = String(month).padStart(2, '0');
+  const yStr = String(year).padStart(4, '0');
+  return `${yStr}-${mStr}-${dStr}`;
 }
 
 /**

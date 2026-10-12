@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { Dialog } from '../../components/ui/dialog';
 import { Button } from '../../components/ui/button';
 import { useI18n } from '../../lib/i18n';
+import { useAuth } from '../auth/AuthContext';
 import type { Customer } from '../../types/database';
-import { Phone, MessageSquare, CreditCard, MapPin, FileText, User, ZoomIn } from 'lucide-react';
+import { Phone, MessageSquare, CreditCard, MapPin, FileText, User, ZoomIn, Trash2, Edit2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ImageZoomModal } from '../../components/ui/image-zoom-modal';
 
@@ -12,6 +13,7 @@ interface CustomerDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   onEdit?: (cust: Customer) => void;
+  onDelete?: (cust: Customer) => void;
 }
 
 export const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
@@ -19,8 +21,10 @@ export const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
   isOpen,
   onClose,
   onEdit,
+  onDelete,
 }) => {
   const { t, language } = useI18n();
+  const { isOwner } = useAuth();
   const navigate = useNavigate();
   const [zoomedImage, setZoomedImage] = useState<{ src: string; title: string } | null>(null);
 
@@ -177,21 +181,39 @@ export const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({
           {t('mortgages.new_mortgage')}
         </Button>
 
-        {onEdit && (
-          <div className="flex justify-end pt-2">
+        <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+          {isOwner && onDelete ? (
             <Button
               type="button"
               variant="ghost"
               size="sm"
+              className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 text-xs"
+              onClick={() => {
+                onClose();
+                onDelete(customer);
+              }}
+            >
+              <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+              <span>{t('common.delete')}</span>
+            </Button>
+          ) : <div />}
+
+          {onEdit && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="text-xs"
               onClick={() => {
                 onClose();
                 onEdit(customer);
               }}
             >
-              {t('common.edit')}
+              <Edit2 className="w-3.5 h-3.5 mr-1.5" />
+              <span>{t('common.edit')}</span>
             </Button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </Dialog>
 

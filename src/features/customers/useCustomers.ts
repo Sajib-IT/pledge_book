@@ -61,7 +61,11 @@ const INITIAL_MOCK_CUSTOMERS: Customer[] = [
 ];
 
 // In-memory store for mock mode
-let mockCustomersStore = [...INITIAL_MOCK_CUSTOMERS];
+export let mockCustomersStore = [...INITIAL_MOCK_CUSTOMERS];
+
+export function clearMockCustomersStore() {
+  mockCustomersStore = [];
+}
 
 export const useCustomers = (searchQuery: string = '') => {
   const { isMockMode, user } = useAuth();
@@ -226,23 +230,51 @@ export const useDeleteCustomer = () => {
       const currentUserId = user?.id;
 
       if (isMockMode || !isSupabaseConfigured) {
-        mockCustomersStore = mockCustomersStore.filter(
-          (c) => !(c.id === id && (!currentUserId || c.created_by === currentUserId))
-        );
+        mockCustomersStore = mockCustomersStore.filter((c) => c.id !== id);
         return;
       }
 
       if (!currentUserId) throw new Error('Not authenticated');
 
-      const { error } = await supabase
-        .from('customers')
-        .delete()
-        .eq('id', id)
-        .eq('created_by', currentUserId);
-      if (error) throw error;
+      // Attempt cascade RPC first
+      const { error: rpcError } = await supabase.rpc('delete_customer_cascade', {
+        p_customer_id: id,
+      });
+
+      if (rpcError) {
+        // Client-side cascade fallback:
+        // 1. Find all mortgage IDs for this customer
+        const { data: mtgs } = await supabase
+          .from('mortgages')
+          .select('id')
+          .eq('customer_id', id);
+
+        const mtgIds = (mtgs || []).map((m: { id: string }) => m.id);
+
+        if (mtgIds.length > 0) {
+          // Delete payments for these mortgages first
+          const { error: payErr } = await supabase.from('payments').delete().in('mortgage_id', mtgIds);
+          if (payErr) console.warn('Payments delete warning:', payErr.message);
+
+          // Delete mortgages
+          const { error: mtgErr } = await supabase.from('mortgages').delete().in('id', mtgIds);
+          if (mtgErr) console.warn('Mortgages delete warning:', mtgErr.message);
+        }
+
+        // 2. Delete customer
+        const { error: directError } = await supabase
+          .from('customers')
+          .delete()
+          .eq('id', id);
+        if (directError) throw directError;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['mortgages'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard_stats'] });
+      queryClient.invalidateQueries({ queryKey: ['due_list'] });
+      queryClient.invalidateQueries({ queryKey: ['receipts'] });
     },
   });
 };
