@@ -24,10 +24,8 @@ import {
   BellRing,
   RotateCw,
   Download,
-  Sparkles,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { getStoredGeminiApiKey, setStoredGeminiApiKey } from '../../lib/stampScanner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import type { Profile } from '../../types/database';
@@ -68,16 +66,7 @@ export const SettingsPage: React.FC = () => {
   const [newPin, setNewPin] = useState('');
   const [pinSuccess, setPinSuccess] = useState(false);
 
-  // Gemini API Key for Stamp Scanner
-  const [geminiApiKey, setGeminiApiKey] = useState<string>(() => getStoredGeminiApiKey());
-  const [geminiKeySaved, setGeminiKeySaved] = useState(false);
 
-  const handleSaveGeminiKey = (e: React.FormEvent) => {
-    e.preventDefault();
-    setStoredGeminiApiKey(geminiApiKey.trim());
-    setGeminiKeySaved(true);
-    setTimeout(() => setGeminiKeySaved(false), 3000);
-  };
 
   const todayStr = getTodayDhakaDateString();
 
@@ -684,66 +673,7 @@ export const SettingsPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* AI Stamp Scanner Settings Card */}
-      <Card className="border-amber-200/80 bg-gradient-to-br from-amber-50/30 via-white to-white shadow-2xs">
-        <CardHeader className="pb-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-amber-600" />
-              <CardTitle>
-                {language === 'bn' ? 'এআই স্ট্যাম্প স্ক্যানার (Google Gemini API)' : 'AI Stamp Scanner (Gemini API)'}
-              </CardTitle>
-            </div>
-            {geminiApiKey ? (
-              <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
-                ● {language === 'bn' ? 'সক্রিয়' : 'Active'}
-              </Badge>
-            ) : (
-              <Badge variant="outline" className="bg-slate-50 text-slate-500 border-slate-200 text-[10px] font-bold">
-                {language === 'bn' ? 'নিষ্ক্রিয়' : 'Inactive'}
-              </Badge>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <p className="text-xs text-slate-600">
-            {language === 'bn'
-              ? 'মোবাইল ক্যামেরা দিয়ে স্ট্যাম্প বা বন্ধকনামার ছবি তুলে স্বয়ংক্রিয়ভাবে ফর্ম পূরণ করার জন্য Google Gemini Vision AI ব্যবহৃত হয়।'
-              : 'Google Gemini Vision AI is used to scan deed stamps and auto-fill customer and mortgage details.'}
-          </p>
 
-          <form onSubmit={handleSaveGeminiKey} className="space-y-3">
-            <div>
-              <label className="text-xs font-bold text-slate-700 mb-1 block">
-                {language === 'bn' ? 'Google Gemini API Key' : 'Gemini API Key'}
-              </label>
-              <div className="flex gap-2">
-                <Input
-                  type="password"
-                  value={geminiApiKey}
-                  onChange={(e) => setGeminiApiKey(e.target.value)}
-                  placeholder="AQ... বা AIzaSy..."
-                  className="font-mono text-xs bg-white"
-                />
-                <Button
-                  type="submit"
-                  size="sm"
-                  className="bg-amber-600 hover:bg-amber-700 text-white shrink-0 font-bold text-xs"
-                >
-                  {geminiKeySaved ? (
-                    <>
-                      <Check className="w-4 h-4 mr-1 text-white" />
-                      <span>{language === 'bn' ? 'সেভ হয়েছে' : 'Saved'}</span>
-                    </>
-                  ) : (
-                    <span>{language === 'bn' ? 'সংরক্ষণ' : 'Save'}</span>
-                  )}
-                </Button>
-              </div>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
 
       {/* Android Native APK Card */}
       <Card className="border-emerald-200/80 bg-gradient-to-br from-emerald-50/40 via-white to-white shadow-2xs">
