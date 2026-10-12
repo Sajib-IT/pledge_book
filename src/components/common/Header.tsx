@@ -33,7 +33,7 @@ export const Header: React.FC = () => {
         {/* Brand Logo & Name */}
         <Link to="/" className="flex items-center gap-2.5 group">
           <div className="w-10 h-10 rounded-xl overflow-hidden shadow-md shadow-emerald-700/20 group-hover:scale-105 transition-transform border border-emerald-600/30 shrink-0">
-            <img src="/app-icon.jpg" alt="PledgeBook Logo" className="w-full h-full object-cover" />
+            <img src="/app-icon.jpg" alt="Pledge Book Logo" className="w-full h-full object-cover" />
           </div>
           <div>
             <div className="font-extrabold text-base sm:text-lg text-slate-900 tracking-tight leading-tight">

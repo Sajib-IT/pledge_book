@@ -1,5 +1,5 @@
 {
-  "app_name": "PledgeBook",
+  "app_name": "Pledge Book",
   "tagline": "Mortgage & Pawn Management",
   "common": {
     "save": "Save",
@@ -42,7 +42,7 @@
     "invalid_credentials": "Invalid credentials provided. Please try again.",
     "access_denied": "You do not have permission to view this section.",
     "register_title": "Create an Account",
-    "register_subtitle": "Enter your details to get started with PledgeBook",
+    "register_subtitle": "Enter your details to get started with Pledge Book",
     "full_name": "Full Name",
     "full_name_placeholder": "e.g. John Doe",
     "email": "Email Address",

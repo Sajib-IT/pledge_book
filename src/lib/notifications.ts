@@ -292,8 +292,8 @@ export async function sendTestNotification(lang: 'bn' | 'en' = 'bn'): Promise<bo
 
     const title =
       lang === 'bn'
-        ? '🔔 টেস্ট নোটিফিকেশন (PledgeBook)'
-        : '🔔 Test Notification (PledgeBook)';
+        ? '🔔 টেস্ট নোটিফিকেশন (Pledge Book)'
+        : '🔔 Test Notification (Pledge Book)';
     const body =
       lang === 'bn'
         ? 'আপনার ফোনে বন্ধকী নোটিফিকেশন সফলভাবে চালু রয়েছে। মেয়াদোত্তীর্ণের অ্যালার্ট যথাসময়ে পাবেন।'

@@ -1,5 +1,5 @@
 -- supabase/seed.sql
--- Production Seed Data for PledgeBook (Mortgage Management - Bangladesh)
+-- Production Seed Data for Pledge Book (Mortgage Management - Bangladesh)
 -- Safe, idempotent, dynamically links to your active owner user
 
 DO $$

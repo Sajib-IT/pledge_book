@@ -77,7 +77,7 @@ export const LoginForm: React.FC = () => {
         {/* App Logo */}
         <div className="text-center mb-6">
           <div className="inline-flex w-16 h-16 rounded-2xl overflow-hidden shadow-xl shadow-emerald-700/25 mb-3 border border-emerald-600/30">
-            <img src="/app-icon.jpg" alt="PledgeBook Logo" className="w-full h-full object-cover" />
+            <img src="/app-icon.jpg" alt="Pledge Book Logo" className="w-full h-full object-cover" />
           </div>
           <h1 className="text-2xl font-black text-slate-900 tracking-tight">
             {t('app_name')}

@@ -698,7 +698,7 @@ export const SettingsPage: React.FC = () => {
 
             <a
               href="/app-release.apk"
-              download="PledgeBook.apk"
+              download="Pledge_Book.apk"
               className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-700/20 transition-all active:scale-95 text-center shrink-0 cursor-pointer"
             >
               <Download className="w-4 h-4" />

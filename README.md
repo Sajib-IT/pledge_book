@@ -1,4 +1,4 @@
-# PledgeBook (প্লেজ বুক) — বন্ধকী ও ঋণ ব্যবস্থাপনা
+# Pledge Book (প্লেজ বুক) — বন্ধকী ও ঋণ ব্যবস্থাপনা
 
 A production-ready **Mortgage & Pawn Management System** tailored for small pawn/mortgage businesses in Bangladesh. Built from **one single codebase** as both a responsive web app and an Android/iOS mobile application using **React, Vite, TypeScript, Tailwind CSS, Supabase, and Capacitor**.
 
@@ -153,4 +153,4 @@ Copy and run [`supabase/tests/business_logic_test.sql`](file:///d:/Personal%20Pr
 ---
 
 ## 📄 License
-Private & Proprietary — Developed for PledgeBook Mortgage Management.
+Private & Proprietary — Developed for Pledge Book Mortgage Management.

@@ -80,7 +80,7 @@ export const ReportsPage: React.FC = () => {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `PledgeBook_Portfolio_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `Pledge_Book_Portfolio_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -145,7 +145,7 @@ export const ReportsPage: React.FC = () => {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `PledgeBook_Payments_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `Pledge_Book_Payments_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
