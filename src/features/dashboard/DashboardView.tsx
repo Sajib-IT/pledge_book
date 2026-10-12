@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { useI18n } from '../../lib/i18n';
 import { formatBDT, toBanglaDigits } from '../../lib/calculations';
@@ -8,7 +8,9 @@ import { MortgageCard } from '../mortgages/MortgageCard';
 import { Card } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { StampScannerModal } from '../../components/common/StampScannerModal';
+import type { StampExtractedData } from '../../lib/stampScanner';
 import {
   Coins,
   TrendingUp,
@@ -18,13 +20,25 @@ import {
   Users,
   Calendar,
   ChevronRight,
+  Sparkles,
 } from 'lucide-react';
 
 export const DashboardView: React.FC = () => {
   const { isOwner } = useAuth();
   const { language, t } = useI18n();
+  const navigate = useNavigate();
+  const [isStampScannerOpen, setIsStampScannerOpen] = useState(false);
   const { data: stats, isLoading: statsLoading } = useDashboardStats();
   const { data: mortgages = [], isLoading: mtgLoading } = useMortgages();
+
+  const handleApplyScannedStamp = (extractedData: StampExtractedData, photoDataUrl: string) => {
+    navigate('/mortgages/new', {
+      state: {
+        scannedStamp: extractedData,
+        scannedPhoto: photoDataUrl,
+      },
+    });
+  };
 
   if (statsLoading || mtgLoading) {
     return <LoadingSpinner message={t('common.loading')} />;
@@ -62,6 +76,16 @@ export const DashboardView: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 pt-2 sm:pt-0">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setIsStampScannerOpen(true)}
+            className="bg-amber-400 hover:bg-amber-300 text-amber-950 border-0 font-black shadow-md h-10 gap-1.5 cursor-pointer"
+          >
+            <Sparkles className="w-4 h-4 text-amber-950" />
+            <span>{language === 'bn' ? 'স্ট্যাম্প স্ক্যান' : 'Scan Stamp'}</span>
+          </Button>
           <Link to="/mortgages/new">
             <Button
               variant="outline"
@@ -226,6 +250,13 @@ export const DashboardView: React.FC = () => {
           ))}
         </div>
       </div>
+
+      {/* Stamp Scanner Modal */}
+      <StampScannerModal
+        isOpen={isStampScannerOpen}
+        onClose={() => setIsStampScannerOpen(false)}
+        onApply={handleApplyScannedStamp}
+      />
     </div>
   );
 };

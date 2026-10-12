@@ -34,15 +34,19 @@ import {
   ZoomIn,
   Clock,
   Calculator,
+  Sparkles,
+  CheckCircle2,
 } from 'lucide-react';
 import { ImageZoomModal } from '../../components/ui/image-zoom-modal';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { captureFromCamera, pickFromGallery, readFileAsDataUrl } from '../../lib/media';
 import {
   compressDocumentPhoto,
   getBase64SizeInBytes,
   formatBytes,
 } from '../../lib/imageCompressor';
+import { StampScannerModal } from '../../components/common/StampScannerModal';
+import type { StampExtractedData } from '../../lib/stampScanner';
 import type { CollateralType } from '../../types/database';
 
 const mortgageSchema = z
@@ -109,6 +113,7 @@ const TERM_PRESETS = [
 export const NewMortgagePage: React.FC = () => {
   const { language, t } = useI18n();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const preselectedCustomerId = searchParams.get('customer_id');
 
@@ -120,6 +125,8 @@ export const NewMortgagePage: React.FC = () => {
     preselectedCustomerId ? 'existing' : 'new'
   );
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
+  const [isStampScannerOpen, setIsStampScannerOpen] = useState(false);
+  const [scanSuccessBanner, setScanSuccessBanner] = useState<string | null>(null);
   const [collateralPhotos, setCollateralPhotos] = useState<string[]>([]);
   const [customerSearch, setCustomerSearch] = useState('');
   const [zoomedPhotoIndex, setZoomedPhotoIndex] = useState<number | null>(null);
@@ -161,6 +168,54 @@ export const NewMortgagePage: React.FC = () => {
     },
   });
 
+  const handleApplyScannedStamp = (extracted: StampExtractedData, photoDataUrl: string) => {
+    setCustomerMode('new');
+    setValue('customer_mode', 'new', { shouldValidate: true });
+
+    if (extracted.customer_name) {
+      setValue('customer_name', extracted.customer_name, { shouldValidate: true });
+    }
+    if (extracted.phone) {
+      setValue('customer_phone', extracted.phone, { shouldValidate: true });
+    }
+    if (extracted.full_address) {
+      setValue('customer_address', extracted.full_address, { shouldValidate: true });
+    }
+    if (extracted.nid_no) {
+      setValue('customer_nid', extracted.nid_no, { shouldValidate: true });
+    }
+    if (extracted.principal_amount && extracted.principal_amount > 0) {
+      setValue('principal', extracted.principal_amount, { shouldValidate: true });
+      setPrincipalInput(extracted.principal_amount.toString());
+    }
+    if (extracted.interest_rate_percent !== null && extracted.interest_rate_percent !== undefined) {
+      setValue('interest_rate', extracted.interest_rate_percent, { shouldValidate: true });
+      setInterestRateInput(extracted.interest_rate_percent.toString());
+      setMonthlyRateInput((extracted.interest_rate_percent / 12).toFixed(2));
+      setRateBasis('yearly');
+    }
+    if (extracted.mortgage_date) {
+      setValue('start_date', extracted.mortgage_date, { shouldValidate: true });
+    }
+    if (extracted.collateral_type) {
+      setValue('collateral_type', extracted.collateral_type, { shouldValidate: true });
+    }
+    if (extracted.collateral_description) {
+      setValue('collateral_description', extracted.collateral_description, { shouldValidate: true });
+    }
+
+    // Prepend the scanned stamp deed into collateral photos list
+    if (photoDataUrl) {
+      setCollateralPhotos((prev) => [photoDataUrl, ...prev]);
+    }
+
+    setScanSuccessBanner(
+      language === 'bn'
+        ? `✓ স্ট্যাম্প থেকে ${extracted.customer_name}-এর তথ্য ও বন্ধকী হিসাব স্বয়ংক্রিয়ভাবে পূরণ করা হয়েছে!`
+        : `✓ Auto-filled from stamp deed for ${extracted.customer_name}!`
+    );
+  };
+
   useEffect(() => {
     if (preselectedCustomerId) {
       setCustomerMode('existing');
@@ -168,6 +223,15 @@ export const NewMortgagePage: React.FC = () => {
       setValue('customer_id', preselectedCustomerId);
     }
   }, [preselectedCustomerId, setValue]);
+
+  // Handle data passed via navigation state (e.g. from Dashboard quick scan)
+  useEffect(() => {
+    const navState = location.state as any;
+    if (navState?.scannedStamp && navState?.scannedPhoto) {
+      handleApplyScannedStamp(navState.scannedStamp, navState.scannedPhoto);
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
 
   // Watch values for real-time calculation preview
   const rawPrincipal = watch('principal');
@@ -314,6 +378,56 @@ export const NewMortgagePage: React.FC = () => {
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        {/* Scan Success Banner */}
+        {scanSuccessBanner && (
+          <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-between gap-3 text-emerald-900 text-xs font-bold shadow-xs animate-in fade-in">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+              <span>{scanSuccessBanner}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setScanSuccessBanner(null)}
+              className="text-emerald-700 hover:text-emerald-950 text-xs px-2 py-1 rounded-lg hover:bg-emerald-100/60 cursor-pointer"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
+        {/* AI Stamp Scanner Banner */}
+        <div className="relative overflow-hidden bg-gradient-to-r from-emerald-700 via-teal-700 to-emerald-800 text-white rounded-2xl p-4 sm:p-5 shadow-lg shadow-emerald-900/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-3.5">
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-white/15 border border-white/20 backdrop-blur-sm flex items-center justify-center shrink-0 shadow-xs">
+              <Sparkles className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-100" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm sm:text-base font-black tracking-tight">
+                  {language === 'bn' ? 'এআই স্ট্যাম্প স্ক্যানার (স্বয়ংক্রিয় ফর্ম পূরণ)' : 'AI Stamp Deed Auto-Fill'}
+                </h2>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-400/25 border border-emerald-300/40 text-emerald-100 uppercase tracking-wider">
+                  AI
+                </span>
+              </div>
+              <p className="text-xs text-emerald-100/90 mt-0.5 max-w-md">
+                {language === 'bn'
+                  ? 'স্ট্যাম্প বা বন্ধকনামার ছবি তুললে নাম, টাকা, তারিখ ও জামানত স্বয়ংক্রিয়ভাবে পূরণ হয়ে যাবে'
+                  : 'Snap a picture of the mortgage stamp deed to auto-detect customer, cash, date & collateral'}
+              </p>
+            </div>
+          </div>
+
+          <Button
+            type="button"
+            onClick={() => setIsStampScannerOpen(true)}
+            className="bg-white hover:bg-emerald-50 text-emerald-950 font-black text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-md transition-all active:scale-95 shrink-0 gap-2 border-0 cursor-pointer"
+          >
+            <Camera className="w-4 h-4 text-emerald-700" />
+            <span>{language === 'bn' ? 'স্ট্যাম্প স্ক্যান করুন' : 'Scan Stamp Deed'}</span>
+          </Button>
+        </div>
+
         {/* 1. Customer Information (Inline New Customer or Existing Select) */}
         <Card className="border-slate-200">
           <CardHeader className="pb-3">
@@ -875,6 +989,13 @@ export const NewMortgagePage: React.FC = () => {
           title={language === 'bn' ? 'জামানতের ছবি প্রিভিউ' : 'Collateral Photo Preview'}
         />
       )}
+
+      {/* AI Stamp Scanner Modal */}
+      <StampScannerModal
+        isOpen={isStampScannerOpen}
+        onClose={() => setIsStampScannerOpen(false)}
+        onApply={handleApplyScannedStamp}
+      />
     </div>
   );
 };
