@@ -163,10 +163,10 @@ Output strictly valid JSON. Do not include markdown code fences or explanatory t
 
   // Try modern models with automatic failover if one model experiences high demand (503/429)
   const modelsToTry = [
+    'gemini-3.1-flash-lite',
     'gemini-3.5-flash',
     'gemini-flash-latest',
     'gemini-3.8-flash',
-    'gemini-3.1-flash-lite',
   ];
 
   let lastError: Error | null = null;
@@ -204,6 +204,12 @@ Output strictly valid JSON. Do not include markdown code fences or explanatory t
           );
           await new Promise((r) => setTimeout(r, 600));
           continue;
+        }
+
+        if (response.status === 401 || response.status === 403) {
+          throw new Error(
+            'Google Gemini API Key-টি অকার্যকর বা মেয়াদোত্তীর্ণ (401 Unauthorized)। অনুগ্রহ করে aistudio.google.com থেকে আপনার সক্রিয় API Key প্রবেশ করান।'
+          );
         }
 
         if (response.status === 503) {

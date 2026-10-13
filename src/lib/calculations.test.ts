@@ -20,6 +20,7 @@ import {
   formatDateDhaka,
   formatDateToDMY,
   parseDMYToISO,
+  getMortgageCycleStartDate,
 } from './calculations';
 
 describe('Mortgage Financial Calculations', () => {
@@ -246,6 +247,33 @@ describe('Date Formatting Logic (Single format: date/month/year)', () => {
     expect(parseDMYToISO('05-04-2025')).toBe('2025-04-05');
     expect(parseDMYToISO('5/4/2025')).toBe('2025-04-05');
     expect(parseDMYToISO('invalid')).toBeNull();
+  });
+});
+
+describe('Historical Mortgage & Cycle Start Calculations', () => {
+  it('returns original start_date if within 1-year term and no payments', () => {
+    const cycleStart = getMortgageCycleStartDate('2026-01-01', '2027-01-01', null);
+    expect(cycleStart).toBe('2026-01-01');
+  });
+
+  it('returns lastInterestPaidOn date when previous interest was settled or renewed', () => {
+    // Mortgage deed began in 2017, but customer paid interest up to 2026-05-10
+    const cycleStart = getMortgageCycleStartDate('2017-05-10', '2027-05-10', '2026-05-10');
+    expect(cycleStart).toBe('2026-05-10');
+  });
+
+  it('calculates 1 year before due date if multi-year historical span without payment record', () => {
+    // Mortgage deed from 2017, due 2027-05-10, no payment record
+    const cycleStart = getMortgageCycleStartDate('2017-05-10', '2027-05-10', null);
+    expect(cycleStart).toBe('2026-05-10');
+  });
+
+  it('correctly calculates single active year interest for a 2017 mortgage migrated with 2026 settlement', () => {
+    const cycleStart = getMortgageCycleStartDate('2017-05-10', '2027-05-10', '2026-05-10');
+    // Active term is 1 year (2026-05-10 to 2027-05-10), NOT 10 years!
+    const termCalc = calculateTermInterest(50000, 25, cycleStart, '2027-05-10');
+    expect(termCalc.termInterest).toBe(12500); // 1 year = 12,500 BDT, not 125,000 BDT
+    expect(termCalc.totalMaturity).toBe(62500);
   });
 });
 

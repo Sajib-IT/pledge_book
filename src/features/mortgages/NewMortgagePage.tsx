@@ -36,6 +36,7 @@ import {
   Calculator,
   Sparkles,
   CheckCircle2,
+  History,
 } from 'lucide-react';
 import { ImageZoomModal } from '../../components/ui/image-zoom-modal';
 import { Link, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
@@ -143,6 +144,9 @@ export const NewMortgagePage: React.FC = () => {
   const [selectedTermPreset, setSelectedTermPreset] = useState<string>('1y');
   const [interestRateInput, setInterestRateInput] = useState<string>(() => defaultRate.toString());
   const [monthlyRateInput, setMonthlyRateInput] = useState<string>(() => (defaultRate / 12).toFixed(2));
+  const [isHistoricalLoan, setIsHistoricalLoan] = useState<boolean>(false);
+  const [interestPaidThroughDate, setInterestPaidThroughDate] = useState<string>(() => todayStr);
+  const [offlineSettlementNote, setOfflineSettlementNote] = useState<string>('');
 
   const {
     register,
@@ -196,6 +200,11 @@ export const NewMortgagePage: React.FC = () => {
     }
     if (extracted.mortgage_date) {
       setValue('start_date', extracted.mortgage_date, { shouldValidate: true });
+      if (extracted.mortgage_date < todayStr.slice(0, 4) + '-01-01') {
+        setIsHistoricalLoan(true);
+        setSelectedTermPreset('custom');
+        setValue('due_date', nextYearStr, { shouldValidate: true });
+      }
     }
     if (extracted.collateral_type) {
       setValue('collateral_type', extracted.collateral_type, { shouldValidate: true });
@@ -243,6 +252,7 @@ export const NewMortgagePage: React.FC = () => {
 
   // Sync due_date when start_date changes or term preset changes
   useEffect(() => {
+    if (isHistoricalLoan) return; // Do not auto-override due date in historical loan mode!
     if (watchedStartDate && selectedTermPreset !== 'custom') {
       const preset = TERM_PRESETS.find((p) => p.id === selectedTermPreset);
       if (preset && preset.months > 0) {
@@ -251,20 +261,21 @@ export const NewMortgagePage: React.FC = () => {
         setValue('due_date', d.toISOString().split('T')[0]);
       }
     }
-  }, [watchedStartDate, selectedTermPreset, setValue]);
+  }, [watchedStartDate, selectedTermPreset, setValue, isHistoricalLoan]);
 
   const handleSelectTerm = (presetId: string, months: number) => {
     setSelectedTermPreset(presetId);
     if (months > 0) {
-      const baseDate = new Date(watchedStartDate || todayStr);
+      const baseDate = new Date(isHistoricalLoan ? interestPaidThroughDate : (watchedStartDate || todayStr));
       baseDate.setMonth(baseDate.getMonth() + months);
       setValue('due_date', baseDate.toISOString().split('T')[0], { shouldValidate: true });
     }
   };
 
-  // Distinct calculation based on chosen customer mortgage terms
-  const termCalculation = calculateTermInterest(watchedPrincipal, watchedRate, watchedStartDate, watchedDueDate);
-  const termDuration = calculateTermDuration(watchedStartDate, watchedDueDate);
+  // Distinct calculation based on chosen customer mortgage terms (for historical loans, computes active cycle from offline paid date)
+  const cycleCalculationStartDate = isHistoricalLoan ? interestPaidThroughDate : watchedStartDate;
+  const termCalculation = calculateTermInterest(watchedPrincipal, watchedRate, cycleCalculationStartDate, watchedDueDate);
+  const termDuration = calculateTermDuration(cycleCalculationStartDate, watchedDueDate);
 
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
@@ -350,6 +361,16 @@ export const NewMortgagePage: React.FC = () => {
         collateral_description: data.collateral_description,
         collateral_photo_paths: compressedPhotos,
         customer: finalCustomer,
+        historical_settlement: isHistoricalLoan
+          ? {
+              interest_paid_through: interestPaidThroughDate,
+              note:
+                offlineSettlementNote.trim() ||
+                (language === 'bn'
+                  ? `বিগত ${data.start_date.substring(0, 4)} হতে ${interestPaidThroughDate.substring(0, 4)} পর্যন্ত বার্ষিক সুদ অফলাইন রসিদে পরিশোধিত।`
+                  : `Historical interest paid offline up to ${interestPaidThroughDate}.`),
+            }
+          : undefined,
       });
 
       navigate(`/mortgages/${created.id}`);
@@ -709,17 +730,120 @@ export const NewMortgagePage: React.FC = () => {
               </div>
             </div>
 
+            {/* Historical Loan & Offline Receipts Migration Toggle */}
+            <div className="p-3.5 sm:p-4 rounded-2xl border border-amber-200/90 bg-gradient-to-r from-amber-50/70 to-orange-50/40 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-start sm:items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-amber-100 text-amber-800 shrink-0 mt-0.5 sm:mt-0">
+                    <History className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs sm:text-sm font-bold text-slate-900">
+                      {language === 'bn'
+                        ? 'পুরাতন বন্ধক ও পূর্ববর্তী অফলাইন রসিদ সমন্বয়'
+                        : 'Historical Loan & Offline Receipts Migration'}
+                    </h4>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      {language === 'bn'
+                        ? 'যেমন: ২০১৭ সালের বন্ধক, যার পূর্ববর্তী সুদ অফলাইনে রসিদে পরিশোধিত হয়েছে'
+                        : 'e.g. Loans taken in 2017 with prior interest paid offline on paper receipts'}
+                    </p>
+                  </div>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={isHistoricalLoan}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setIsHistoricalLoan(checked);
+                      if (checked) {
+                        setSelectedTermPreset('custom');
+                        // Auto-set due date 1 year from interest paid through
+                        const d = new Date(interestPaidThroughDate);
+                        d.setFullYear(d.getFullYear() + 1);
+                        setValue('due_date', d.toISOString().split('T')[0], { shouldValidate: true });
+                      }
+                    }}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600"></div>
+                </label>
+              </div>
+
+              {isHistoricalLoan && (
+                <div className="pt-2 border-t border-amber-200/60 space-y-3 animate-in fade-in">
+                  <div className="p-2.5 rounded-xl bg-white/90 border border-amber-200/80 text-xs text-amber-900 leading-relaxed font-medium">
+                    {language === 'bn'
+                      ? '💡 সমাধান: দলিলের মূল শুরুর তারিখ (যেমন: ২০১৭ সাল) রেকর্ডে অবিকল থাকবে, কিন্তু বিগত বছরগুলোর জন্য অহেতুক বকেয়া বা অতিরিক্ত সুদ দেখাবে না। গ্রাহক অফলাইনে যে তারিখ পর্যন্ত সুদ দিয়েছেন, তার পরবর্তী চলতি মেয়াদের হিসাব হবে।'
+                      : '💡 Solution: Retains the original legal deed start date (e.g. 2017) without showing false past overdue or 8-9 years accumulated interest.'}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <DatePicker
+                      label={
+                        language === 'bn'
+                          ? 'অফলাইনে কোন তারিখ পর্যন্ত সুদ পরিশোধিত?'
+                          : 'Interest Paid Through (Offline)'
+                      }
+                      value={interestPaidThroughDate}
+                      onChange={(val) => {
+                        setInterestPaidThroughDate(val);
+                        // Auto-set due date to 1 year after this paid through date
+                        const d = new Date(val);
+                        d.setFullYear(d.getFullYear() + 1);
+                        setValue('due_date', d.toISOString().split('T')[0], { shouldValidate: true });
+                      }}
+                      helperText={
+                        language === 'bn'
+                          ? 'এই তারিখ পর্যন্ত পূর্ববর্তী সকল সুদ গ্রাহক অফলাইনে পরিশোধ করেছেন'
+                          : 'Customer cleared all prior interest offline up to this date'
+                      }
+                    />
+
+                    <Input
+                      label={
+                        language === 'bn'
+                          ? 'অফলাইন রসিদের বিবরণ / নোট'
+                          : 'Offline Settlement Note'
+                      }
+                      placeholder={
+                        language === 'bn'
+                          ? 'যেমন: বিগত ২০১৭ হতে ২০২৬ পর্যন্ত অফলাইন রসিদে বার্ষিক সুদ পরিশোধিত'
+                          : 'e.g. Annual interest 2017-2026 settled via paper receipts'
+                      }
+                      value={offlineSettlementNote}
+                      onChange={(e) => setOfflineSettlementNote(e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Dates Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <DatePicker
-                label={t('mortgages.start_date')}
+                label={
+                  isHistoricalLoan
+                    ? (language === 'bn' ? 'মূল দলিলের শুরুর তারিখ (যেমন: ২০১৭)' : 'Original Deed Start Date')
+                    : t('mortgages.start_date')
+                }
                 value={watchedStartDate}
                 onChange={(val) => setValue('start_date', val, { shouldValidate: true })}
                 error={errors.start_date?.message}
+                helperText={
+                  isHistoricalLoan
+                    ? (language === 'bn' ? 'আইনগত স্ট্যাম্প/দলিলের তারিখ অপরিবর্তিত থাকবে' : 'Legal deed date preserved')
+                    : undefined
+                }
               />
 
               <DatePicker
-                label={t('mortgages.due_date')}
+                label={
+                  isHistoricalLoan
+                    ? (language === 'bn' ? 'চলতি মেয়াদের শেষ তারিখ (Due Date)' : 'Active Cycle Due Date')
+                    : t('mortgages.due_date')
+                }
                 value={watchedDueDate}
                 onChange={(val) => {
                   setSelectedTermPreset('custom');
@@ -728,8 +852,8 @@ export const NewMortgagePage: React.FC = () => {
                 error={errors.due_date?.message}
                 helperText={
                   language === 'bn'
-                    ? `মেয়াদকাল: ${termDuration.termLabelBn}`
-                    : `Duration: ${termDuration.termLabelEn}`
+                    ? `চলতি মেয়াদকাল: ${termDuration.termLabelBn}`
+                    : `Active Term Duration: ${termDuration.termLabelEn}`
                 }
               />
             </div>
@@ -745,9 +869,16 @@ export const NewMortgagePage: React.FC = () => {
                       : 'Distinct Customer Calculation & Term Breakdown'}
                   </span>
                 </span>
-                <span className="text-[11px] font-bold text-emerald-700 bg-white px-2.5 py-0.5 rounded-lg border border-emerald-200">
-                  {language === 'bn' ? termDuration.termLabelBn : termDuration.termLabelEn}
-                </span>
+                <div className="flex items-center gap-2">
+                  {isHistoricalLoan && (
+                    <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded border border-amber-300">
+                      {language === 'bn' ? '📜 অফলাইন সমন্বয়কৃত চলতি হিসাব' : 'Historical Migrated'}
+                    </span>
+                  )}
+                  <span className="text-[11px] font-bold text-emerald-700 bg-white px-2.5 py-0.5 rounded-lg border border-emerald-200">
+                    {language === 'bn' ? termDuration.termLabelBn : termDuration.termLabelEn}
+                  </span>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">

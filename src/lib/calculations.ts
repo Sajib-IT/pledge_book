@@ -19,6 +19,39 @@ export interface EarlyRepaymentCalculation {
 }
 
 /**
+ * Determines the start date for the current active interest calculation cycle.
+ * For historical mortgages (e.g. started in 2017) where prior interest was settled offline
+ * or renewed annually, the active billing cycle starts from the last interest payment/settlement date.
+ */
+export function getMortgageCycleStartDate(
+  startDateStr: string,
+  dueDateStr: string,
+  lastInterestPaidOn?: string | null
+): string {
+  if (lastInterestPaidOn && lastInterestPaidOn.trim()) {
+    return lastInterestPaidOn.trim();
+  }
+  if (!startDateStr || !dueDateStr) return startDateStr || '';
+
+  const start = new Date(startDateStr + 'T00:00:00+06:00');
+  const due = new Date(dueDateStr + 'T00:00:00+06:00');
+  const diffDays = Math.round((due.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays > 370) {
+    const parts = dueDateStr.split('-');
+    if (parts.length === 3) {
+      const prevYear = Number(parts[0]) - 1;
+      let month = parts[1];
+      let day = parts[2];
+      if (month === '02' && day === '29' && prevYear % 4 !== 0) {
+        day = '28';
+      }
+      return `${prevYear}-${month}-${day}`;
+    }
+  }
+  return startDateStr;
+}
+
+/**
  * Calculates yearly flat interest amount in BDT.
  * Rate is percentage (e.g. 25 for 25%).
  * Formula: round((principal * interestRate) / 100)

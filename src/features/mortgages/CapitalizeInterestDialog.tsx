@@ -14,12 +14,14 @@ import {
   calculateEarlySettlement,
   getTodayDhakaDateString,
   calculateYearlyInterest,
+  getMortgageCycleStartDate,
 } from '../../lib/calculations';
 import { useCapitalizeInterest } from './useMortgages';
 import { TrendingUp, CheckCircle2, AlertCircle } from 'lucide-react';
 
 interface CapitalizeInterestDialogProps {
   mortgage: Mortgage;
+  currentCycleStartDate?: string;
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: (newPrincipal: number) => void;
@@ -27,6 +29,7 @@ interface CapitalizeInterestDialogProps {
 
 export const CapitalizeInterestDialog: React.FC<CapitalizeInterestDialogProps> = ({
   mortgage,
+  currentCycleStartDate,
   isOpen,
   onClose,
   onSuccess,
@@ -35,13 +38,14 @@ export const CapitalizeInterestDialog: React.FC<CapitalizeInterestDialogProps> =
   const capitalizeMutation = useCapitalizeInterest();
 
   const todayStr = getTodayDhakaDateString();
-  const { monthsElapsed } = calculateElapsedDuration(mortgage.start_date, todayStr);
+  const cycleStart = currentCycleStartDate || getMortgageCycleStartDate(mortgage.start_date, mortgage.due_date);
+  const { monthsElapsed } = calculateElapsedDuration(cycleStart, todayStr);
 
-  // Suggested accrued interest calculation
+  // Suggested accrued interest calculation based on active cycle
   const settlement = calculateEarlySettlement(
     mortgage.principal,
     mortgage.interest_rate,
-    mortgage.start_date,
+    cycleStart,
     todayStr,
     'monthly'
   );

@@ -116,4 +116,20 @@ describe('Stamp Scanner Service', () => {
 
     expect(result.collateral_type).toBe('other');
   });
+
+  it('throws friendly error on 401 unauthorized', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        statusText: 'Unauthorized',
+        json: async () => ({ error: { message: 'API key not valid' } }),
+      } as any)
+    );
+
+    await expect(
+      scanStampDocument('data:image/jpeg;base64,abc123xyz', 'invalid-key')
+    ).rejects.toThrow(/401 Unauthorized/);
+  });
 });

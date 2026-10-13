@@ -284,6 +284,11 @@ export const useMortgageDetail = (mortgageId: string | undefined) => {
   });
 };
 
+export interface HistoricalSettlementInput {
+  interest_paid_through: string;
+  note?: string;
+}
+
 export interface CreateMortgageInput {
   customer_id: string;
   principal: number;
@@ -294,6 +299,7 @@ export interface CreateMortgageInput {
   collateral_description: string;
   collateral_photo_paths?: string[];
   customer?: any;
+  historical_settlement?: HistoricalSettlementInput;
 }
 
 export const useCreateMortgage = () => {
@@ -325,6 +331,26 @@ export const useCreateMortgage = () => {
           customer: input.customer,
         };
         mockMortgagesStore = [newMtg, ...mockMortgagesStore];
+
+        if (input.historical_settlement?.interest_paid_through) {
+          const histReceiptNo = `HIST-${yearMonth}-${receiptCounter++}`;
+          const histPayment: Payment = {
+            id: `mock-pay-hist-${Date.now()}`,
+            receipt_no: histReceiptNo,
+            mortgage_id: newMtg.id,
+            paid_on: input.historical_settlement.interest_paid_through,
+            type: 'interest',
+            amount: 0,
+            received_by: user?.id || null,
+            note:
+              input.historical_settlement.note ||
+              'বিগত বছরগুলোর বার্ষিক সুদ অফলাইন রসিদে পরিশোধিত। সফটওয়্যারে চলতি মেয়াদের হিসাব শুরু।',
+            original_payment_id: null,
+            created_at: new Date().toISOString(),
+          };
+          mockPaymentsStore = [histPayment, ...mockPaymentsStore];
+        }
+
         return newMtg;
       }
 
@@ -341,12 +367,120 @@ export const useCreateMortgage = () => {
       });
 
       if (error) throw error;
-      return data as unknown as Mortgage;
+      const createdMtg = data as unknown as Mortgage;
+
+      if (input.historical_settlement?.interest_paid_through && createdMtg?.id) {
+        try {
+          const yearMonth = new Date().toISOString().slice(0, 7).replace('-', '');
+          const histReceiptNo = `HIST-${yearMonth}-${Math.floor(1000 + Math.random() * 9000)}`;
+          await supabase.from('payments').insert({
+            mortgage_id: createdMtg.id,
+            receipt_no: histReceiptNo,
+            paid_on: input.historical_settlement.interest_paid_through,
+            type: 'interest',
+            amount: 0,
+            received_by: user?.id || null,
+            note:
+              input.historical_settlement.note ||
+              'বিগত বছরগুলোর বার্ষিক সুদ অফলাইন রসিদে পরিশোধিত। সফটওয়্যারে চলতি মেয়াদের হিসাব শুরু।',
+          });
+        } catch (histErr) {
+          console.warn('Failed to insert historical opening payment:', histErr);
+        }
+      }
+
+      return createdMtg;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['mortgages'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard_stats'] });
       if (data) scheduleMortgageNotifications(data);
+    },
+  });
+};
+
+export interface RecordHistoricalSettlementInput {
+  mortgageId: string;
+  interestPaidThrough: string;
+  newDueDate?: string;
+  note?: string;
+}
+
+export const useRecordHistoricalSettlement = () => {
+  const queryClient = useQueryClient();
+  const { isMockMode, user } = useAuth();
+
+  return useMutation({
+    mutationFn: async ({
+      mortgageId,
+      interestPaidThrough,
+      newDueDate,
+      note,
+    }: RecordHistoricalSettlementInput) => {
+      const yearMonth = new Date().toISOString().slice(0, 7).replace('-', '');
+      const histReceiptNo = `HIST-${yearMonth}-${Math.floor(1000 + Math.random() * 9000)}`;
+      const histNote =
+        note || 'বিগত বছরগুলোর বার্ষিক সুদ অফলাইন রসিদে পরিশোধিত। সফটওয়্যারে চলতি মেয়াদের হিসাব কার্যকর।';
+
+      if (isMockMode || !isSupabaseConfigured) {
+        const mtgIndex = mockMortgagesStore.findIndex((m) => m.id === mortgageId);
+        if (mtgIndex === -1) throw new Error('Mortgage not found');
+
+        const histPayment: Payment = {
+          id: `mock-pay-hist-${Date.now()}`,
+          receipt_no: histReceiptNo,
+          mortgage_id: mortgageId,
+          paid_on: interestPaidThrough,
+          type: 'interest',
+          amount: 0,
+          received_by: user?.id || null,
+          note: histNote,
+          original_payment_id: null,
+          created_at: new Date().toISOString(),
+        };
+
+        mockPaymentsStore = [histPayment, ...mockPaymentsStore];
+
+        if (newDueDate) {
+          mockMortgagesStore[mtgIndex] = {
+            ...mockMortgagesStore[mtgIndex],
+            due_date: newDueDate,
+            updated_at: new Date().toISOString(),
+          };
+        }
+
+        return { success: true, receipt_no: histReceiptNo };
+      }
+
+      // Live Supabase insert into payments
+      const { error: payErr } = await supabase.from('payments').insert({
+        mortgage_id: mortgageId,
+        receipt_no: histReceiptNo,
+        paid_on: interestPaidThrough,
+        type: 'interest',
+        amount: 0,
+        received_by: user?.id || null,
+        note: histNote,
+      });
+      if (payErr) throw payErr;
+
+      if (newDueDate) {
+        const { error: mtgErr } = await supabase
+          .from('mortgages')
+          .update({
+            due_date: newDueDate,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', mortgageId);
+        if (mtgErr) throw mtgErr;
+      }
+
+      return { success: true, receipt_no: histReceiptNo };
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['mortgage', variables.mortgageId] });
+      queryClient.invalidateQueries({ queryKey: ['mortgages'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard_stats'] });
     },
   });
 };

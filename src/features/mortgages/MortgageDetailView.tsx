@@ -6,6 +6,7 @@ import {
   useCloseMortgage,
   useAddCorrection,
   useDeleteMortgage,
+  useRecordHistoricalSettlement,
 } from './useMortgages';
 import { useAuth } from '../auth/AuthContext';
 import { CapitalizeInterestDialog } from './CapitalizeInterestDialog';
@@ -22,6 +23,7 @@ import {
   calculateEarlySettlement,
   calculateRenewWithDiscount,
   getTodayDhakaDateString,
+  getMortgageCycleStartDate,
   type InterestCalculationMode,
 } from '../../lib/calculations';
 import { Button } from '../../components/ui/button';
@@ -50,6 +52,7 @@ import {
   TrendingUp,
   Edit2,
   Trash2,
+  History,
 } from 'lucide-react';
 import { ReceiptModal } from '../receipts/ReceiptModal';
 import { ImageZoomModal } from '../../components/ui/image-zoom-modal';
@@ -65,18 +68,25 @@ export const MortgageDetailView: React.FC = () => {
   const closeMutation = useCloseMortgage();
   const correctionMutation = useAddCorrection();
   const deleteMortgageMutation = useDeleteMortgage();
+  const reconcileMutation = useRecordHistoricalSettlement();
 
   // Modals state
   const [isRenewModalOpen, setIsRenewModalOpen] = useState(false);
   const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
   const [isCapitalizeModalOpen, setIsCapitalizeModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isReconcileModalOpen, setIsReconcileModalOpen] = useState(false);
   const [correctionTargetPayment, setCorrectionTargetPayment] = useState<Payment | null>(null);
 
   // Form states for modals
   const [paymentDate, setPaymentDate] = useState(getTodayDhakaDateString());
   const [paymentNote, setPaymentNote] = useState('');
   const [correctionReason, setCorrectionReason] = useState('');
+
+  // Reconcile Historical Offline Periods Form States
+  const [reconcilePaidThrough, setReconcilePaidThrough] = useState(getTodayDhakaDateString());
+  const [reconcileNewDueDate, setReconcileNewDueDate] = useState('');
+  const [reconcileNote, setReconcileNote] = useState('');
 
   // Close Modal Early Repayment & Discount States
   const [closeMode, setCloseMode] = useState<InterestCalculationMode>('full_year');
@@ -115,19 +125,31 @@ export const MortgageDetailView: React.FC = () => {
   const { mortgage, payments } = data;
   const isOverdue = isMortgageOverdue(mortgage.due_date, mortgage.status);
   const daysUntilDue = getDaysUntilDue(mortgage.due_date);
+
+  // Latest interest payment (renewal or offline historical settlement)
+  const lastInterestPayment = payments
+    ?.filter((p) => p.type === 'interest' && p.amount >= 0)
+    ?.sort((a, b) => b.paid_on.localeCompare(a.paid_on))[0];
+
+  const currentCycleStartDate = getMortgageCycleStartDate(
+    mortgage.start_date,
+    mortgage.due_date,
+    lastInterestPayment?.paid_on
+  );
+
   const termCalc = calculateTermInterest(
     mortgage.principal,
     mortgage.interest_rate,
-    mortgage.start_date,
+    currentCycleStartDate,
     mortgage.due_date
   );
-  const termDur = calculateTermDuration(mortgage.start_date, mortgage.due_date);
+  const termDur = calculateTermDuration(currentCycleStartDate, mortgage.due_date);
 
   // Early repayment calculation for Close Modal
   const earlySettlement = calculateEarlySettlement(
     mortgage.principal,
     mortgage.interest_rate,
-    mortgage.start_date,
+    currentCycleStartDate,
     paymentDate,
     closeMode,
     closeDiscount,
@@ -257,6 +279,36 @@ export const MortgageDetailView: React.FC = () => {
     }
   };
 
+  // Submit Reconcile Historical Offline Periods
+  const handleConfirmReconcile = async () => {
+    try {
+      const res = await reconcileMutation.mutateAsync({
+        mortgageId: mortgage.id,
+        interestPaidThrough: reconcilePaidThrough,
+        newDueDate: reconcileNewDueDate || undefined,
+        note:
+          reconcileNote.trim() ||
+          (language === 'bn'
+            ? `বিগত ${mortgage.start_date.substring(0, 4)} হতে ${reconcilePaidThrough.substring(0, 4)} পর্যন্ত বার্ষিক সুদ অফলাইন রসিদে পরিশোধিত। সফটওয়্যারে চলতি মেয়াদের হিসাব কার্যকর করা হলো।`
+            : `Historical interest settled offline up to ${reconcilePaidThrough}.`),
+      });
+
+      setIsReconcileModalOpen(false);
+      setSuccessReceipt({
+        type: 'renew',
+        receipt_no: (res as any).receipt_no,
+        amount: 0,
+      });
+      refetch();
+    } catch (err) {
+      alert(
+        (language === 'bn'
+          ? 'অফলাইন হিসাব সমন্বয় করতে সমস্যা হয়েছে: '
+          : 'Failed to reconcile offline history: ') + (err as Error).message
+      );
+    }
+  };
+
   const handleDeleteMortgage = async () => {
     const confirmMsg =
       language === 'bn'
@@ -286,7 +338,7 @@ export const MortgageDetailView: React.FC = () => {
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="font-mono text-sm font-black text-slate-800 bg-slate-100 px-2.5 py-0.5 rounded-lg border border-slate-200">
                 {mortgage.mortgage_no}
               </span>
@@ -305,10 +357,19 @@ export const MortgageDetailView: React.FC = () => {
                   <span>{t('mortgages.status_active')}</span>
                 </Badge>
               )}
+              {currentCycleStartDate !== mortgage.start_date && (
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-md">
+                  <History className="w-3 h-3 text-amber-700" />
+                  <span>{language === 'bn' ? 'অফলাইন সমন্বয়কৃত' : 'Migrated'}</span>
+                </span>
+              )}
             </div>
             <p className="text-xs text-slate-500 mt-1">
-              {t('mortgages.start_date')}: {formatDateDhaka(mortgage.start_date, language)} • {t('mortgages.due_date')}:{' '}
-              {formatDateDhaka(mortgage.due_date, language)}
+              {t('mortgages.start_date')}: {formatDateDhaka(mortgage.start_date, language)}
+              {currentCycleStartDate !== mortgage.start_date && (
+                <span> • <strong className="text-amber-800 font-semibold">{language === 'bn' ? 'চলতি চক্র' : 'Current Cycle'}: {formatDateDhaka(currentCycleStartDate, language)}</strong></span>
+              )}
+              {' '}• {t('mortgages.due_date')}: {formatDateDhaka(mortgage.due_date, language)}
             </p>
           </div>
         </div>
@@ -341,6 +402,29 @@ export const MortgageDetailView: React.FC = () => {
               >
                 <TrendingUp className="w-4 h-4 text-amber-600" />
                 <span>{language === 'bn' ? 'সুদ আসলে যোগ' : 'Add to Principal'}</span>
+              </Button>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setReconcilePaidThrough(getTodayDhakaDateString());
+                  const nextDue = new Date();
+                  nextDue.setFullYear(nextDue.getFullYear() + 1);
+                  setReconcileNewDueDate(nextDue.toISOString().split('T')[0]);
+                  setReconcileNote(
+                    language === 'bn'
+                      ? `বিগত ${mortgage.start_date.substring(0, 4)} হতে ${getTodayDhakaDateString().substring(0, 4)} পর্যন্ত বার্ষিক সুদ অফলাইন রসিদে পরিশোধিত।`
+                      : `Prior interest settled offline up to ${getTodayDhakaDateString()}.`
+                  );
+                  setIsReconcileModalOpen(true);
+                }}
+                className="gap-1.5 border-amber-300 text-amber-900 bg-amber-50/60 hover:bg-amber-100 font-bold"
+                title={language === 'bn' ? 'পূর্ববর্তী বছরগুলোর অফলাইন রসিদ সমন্বয় করুন' : 'Reconcile past offline interest payments'}
+              >
+                <History className="w-4 h-4 text-amber-700" />
+                <span>{language === 'bn' ? 'অফলাইন রসিদ সমন্বয়' : 'Reconcile Offline'}</span>
               </Button>
 
               <Button
@@ -437,20 +521,42 @@ export const MortgageDetailView: React.FC = () => {
 
       {/* Overdue Alert Banner */}
       {isOverdue && (
-        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 flex items-start gap-3 text-rose-900">
-          <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
-          <div className="flex-1 text-xs sm:text-sm">
-            <p className="font-bold">
-              {language === 'bn'
-                ? `সতর্কতা: এই বন্ধকটির মেয়াদ ${Math.abs(daysUntilDue)} দিন আগে উত্তীর্ণ হয়েছে!`
-                : `Warning: This mortgage expired ${Math.abs(daysUntilDue)} days ago!`}
-            </p>
-            <p className="text-rose-700 text-xs mt-0.5">
-              {language === 'bn'
-                ? 'অনতিবিলম্বে গ্রাহকের সাথে যোগাযোগ করে বার্ষিক সুদ আদায়পূর্বক নবায়ন অথবা আসল+সুদ সম্পূর্ণ আদায় করুন।'
-                : 'Contact customer immediately to collect annual interest renewal or full settlement.'}
-            </p>
+        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-rose-900">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+            <div className="flex-1 text-xs sm:text-sm">
+              <p className="font-bold">
+                {language === 'bn'
+                  ? `সতর্কতা: এই বন্ধকটির মেয়াদ ${Math.abs(daysUntilDue)} দিন আগে উত্তীর্ণ হয়েছে!`
+                  : `Warning: This mortgage expired ${Math.abs(daysUntilDue)} days ago!`}
+              </p>
+              <p className="text-rose-700 text-xs mt-0.5">
+                {language === 'bn'
+                  ? 'গ্রাহক যদি পূর্ববর্তী বছরগুলোর সুদ অফলাইনে পরিশোধ করে থাকেন, তবে অফলাইন রসিদ সমন্বয় করে বকেয়া দূর করুন।'
+                  : 'If the customer already paid past interest offline, reconcile receipts to clear overdue alert.'}
+              </p>
+            </div>
           </div>
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => {
+              setReconcilePaidThrough(getTodayDhakaDateString());
+              const nextDue = new Date();
+              nextDue.setFullYear(nextDue.getFullYear() + 1);
+              setReconcileNewDueDate(nextDue.toISOString().split('T')[0]);
+              setReconcileNote(
+                language === 'bn'
+                  ? `বিগত ${mortgage.start_date.substring(0, 4)} হতে ${getTodayDhakaDateString().substring(0, 4)} পর্যন্ত বার্ষিক সুদ অফলাইন রসিদে পরিশোধিত।`
+                  : `Prior interest settled offline up to ${getTodayDhakaDateString()}.`
+              );
+              setIsReconcileModalOpen(true);
+            }}
+            className="bg-rose-600 hover:bg-rose-700 text-white font-bold gap-1.5 shrink-0 text-xs shadow-xs"
+          >
+            <History className="w-3.5 h-3.5" />
+            <span>{language === 'bn' ? 'অফলাইন রসিদ দিয়ে বকেয়া সমন্বয়' : 'Reconcile Offline Due'}</span>
+          </Button>
         </div>
       )}
 
@@ -579,12 +685,18 @@ export const MortgageDetailView: React.FC = () => {
                   {payments.map((p) => {
                     const isCorrection = p.type === 'correction';
                     const isFullPayment = p.type === 'full_payment';
+                    const isHistoricalSettlement =
+                      p.receipt_no.startsWith('HIST-') || (p.type === 'interest' && p.amount === 0);
 
                     return (
                       <div
                         key={p.id}
                         className={`py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-                          isCorrection ? 'bg-rose-50/40 -mx-4 px-4 rounded-xl' : ''
+                          isCorrection
+                            ? 'bg-rose-50/40 -mx-4 px-4 rounded-xl'
+                            : isHistoricalSettlement
+                            ? 'bg-amber-50/40 -mx-4 px-4 rounded-xl border-l-4 border-amber-400'
+                            : ''
                         }`}
                       >
                         <div className="space-y-1">
@@ -592,21 +704,27 @@ export const MortgageDetailView: React.FC = () => {
                             <span className="font-mono text-xs font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded">
                               {p.receipt_no}
                             </span>
-                            <Badge
-                              variant={
-                                isCorrection
-                                  ? 'reversal'
+                            {isHistoricalSettlement ? (
+                              <Badge variant="outline" className="border-amber-300 text-amber-800 bg-amber-50">
+                                {language === 'bn' ? 'অফলাইন হিসাব সমন্বয়' : 'Historical Settlement'}
+                              </Badge>
+                            ) : (
+                              <Badge
+                                variant={
+                                  isCorrection
+                                    ? 'reversal'
+                                    : isFullPayment
+                                    ? 'closed'
+                                    : 'active'
+                                }
+                              >
+                                {isCorrection
+                                  ? t('payments.type_correction')
                                   : isFullPayment
-                                  ? 'closed'
-                                  : 'active'
-                              }
-                            >
-                              {isCorrection
-                                ? t('payments.type_correction')
-                                : isFullPayment
-                                ? t('payments.type_full_payment')
-                                : t('payments.type_interest')}
-                            </Badge>
+                                  ? t('payments.type_full_payment')
+                                  : t('payments.type_interest')}
+                              </Badge>
+                            )}
                           </div>
                           <p className="text-xs text-slate-500">
                             {t('payments.paid_on')}: {formatDateDhaka(p.paid_on, language)}
@@ -623,13 +741,17 @@ export const MortgageDetailView: React.FC = () => {
 
                         <div className="flex items-center justify-between sm:justify-end gap-3 pt-1 sm:pt-0">
                           <span
-                            className={`font-mono text-base font-black ${
-                              p.amount < 0
-                                ? 'text-rose-600'
-                                : 'text-slate-900'
+                            className={`font-mono ${
+                              isHistoricalSettlement
+                                ? 'text-xs sm:text-sm font-bold text-amber-800 bg-amber-100/70 px-2.5 py-1 rounded-lg border border-amber-200'
+                                : p.amount < 0
+                                ? 'text-base font-black text-rose-600'
+                                : 'text-base font-black text-slate-900'
                             }`}
                           >
-                            {formatBDT(p.amount, language)}
+                            {isHistoricalSettlement
+                              ? (language === 'bn' ? '৳ ০ (পূর্ববর্তী হিসাব সমন্বয়)' : '৳ 0 (Settled)')
+                              : formatBDT(p.amount, language)}
                           </span>
 
                           <div className="flex items-center gap-1">
@@ -1108,6 +1230,109 @@ export const MortgageDetailView: React.FC = () => {
         onClose={() => setSelectedReceiptPayment(null)}
       />
 
+      {/* MODAL 4: RECONCILE HISTORICAL OFFLINE PERIODS */}
+      <Dialog
+        isOpen={isReconcileModalOpen}
+        onClose={() => setIsReconcileModalOpen(false)}
+        title={language === 'bn' ? 'পূর্ববর্তী অফলাইন রসিদ ও মেয়াদ সমন্বয়' : 'Reconcile Past Offline Periods & Due Date'}
+        description={
+          language === 'bn'
+            ? `বন্ধক নং: ${mortgage.mortgage_no} — গ্রাহকের পূর্ববর্তী অফলাইন রসিদ সমন্বয় করে চলতি মেয়াদের হিসাব হালনাগাদ করুন`
+            : `Mortgage ${mortgage.mortgage_no} — Settle past offline receipts and advance to active term`
+        }
+      >
+        <div className="space-y-4">
+          <div className="p-3.5 rounded-2xl bg-amber-50/80 border border-amber-200 text-xs text-amber-950 space-y-2">
+            <div className="flex items-center justify-between">
+              <span>{language === 'bn' ? 'মূল বন্ধকী শুরুর তারিখ (দলিল):' : 'Original Deed Start Date:'}</span>
+              <strong className="font-mono text-sm">{formatDateDhaka(mortgage.start_date, language)}</strong>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>{language === 'bn' ? 'বর্তমান সিস্টেমে মেয়াদ:' : 'Current System Due Date:'}</span>
+              <strong className="font-mono text-sm text-rose-700">{formatDateDhaka(mortgage.due_date, language)}</strong>
+            </div>
+            <p className="text-[11px] text-amber-800 pt-1 border-t border-amber-200/60 leading-relaxed font-medium">
+              {language === 'bn'
+                ? '💡 গ্রাহক অতীতে অফলাইনে (খাতা/মেমো রসিদে) যে তারিখ পর্যন্ত সুদ পরিশোধ করেছেন তা নির্বাচন করুন। সিস্টেম স্বয়ংক্রিয়ভাবে একটি সমন্বয় রসিদ সংরক্ষণ করবে এবং বকেয়া সতর্কতা দূর করে চলতি মেয়াদের হিসাব চালু করবে।'
+                : '💡 Select the date up to which the customer cleared interest offline. The system will create an opening settlement record and advance the active due date.'}
+            </p>
+          </div>
+
+          <DatePicker
+            label={
+              language === 'bn'
+                ? 'অফলাইনে কোন তারিখ পর্যন্ত সুদ পরিশোধিত হয়েছে?'
+                : 'Interest Paid Through (Offline)'
+            }
+            value={reconcilePaidThrough}
+            onChange={(val) => {
+              setReconcilePaidThrough(val);
+              // Auto calculate new due date 1 year from that date
+              const parts = val.split('-');
+              if (parts.length === 3) {
+                const nextYear = Number(parts[0]) + 1;
+                setReconcileNewDueDate(`${nextYear}-${parts[1]}-${parts[2]}`);
+              }
+            }}
+            helperText={
+              language === 'bn'
+                ? 'এই তারিখ পর্যন্ত পূর্ববর্তী সকল সুদ ঐতিহ্যবাহী রসিদে পরিশোধিত ধরা হবে'
+                : 'All prior interest up to this date is treated as fully settled offline'
+            }
+          />
+
+          <DatePicker
+            label={
+              language === 'bn'
+                ? 'পরবর্তী চলতি মেয়াদের শেষ তারিখ (নতুন Due Date)'
+                : 'Next Cycle Due Date'
+            }
+            value={reconcileNewDueDate}
+            onChange={(val) => setReconcileNewDueDate(val)}
+            helperText={
+              language === 'bn'
+                ? 'চলতি মেয়াদের মেয়াদ উত্তীর্ণের তারিখ (সাধারণত পরিশোধের ১ বছর পর)'
+                : 'The due date for the currently active cycle'
+            }
+          />
+
+          <Input
+            label={
+              language === 'bn'
+                ? 'অফলাইন রসিদের বিবরণ / নোট'
+                : 'Offline Settlement Note'
+            }
+            placeholder={
+              language === 'bn'
+                ? 'যেমন: বিগত ২০১৭ হতে ২০২৬ পর্যন্ত বার্ষিক সুদ অফলাইন রসিদে পরিশোধিত...'
+                : 'e.g. Prior annual interest settled offline on receipts...'
+            }
+            value={reconcileNote}
+            onChange={(e) => setReconcileNote(e.target.value)}
+          />
+
+          <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsReconcileModalOpen(false)}
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              onClick={handleConfirmReconcile}
+              isLoading={reconcileMutation.isPending}
+              className="bg-amber-600 hover:bg-amber-700 text-white font-bold"
+            >
+              <CheckCircle2 className="w-4 h-4 mr-1.5" />
+              <span>{language === 'bn' ? 'সমন্বয় সম্পন্ন করুন' : 'Confirm Settlement'}</span>
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+
       {/* COLLATERAL PHOTO ZOOM MODAL */}
       {zoomedImageIndex !== null && mortgage.collateral_photo_paths && (
         <ImageZoomModal
@@ -1126,6 +1351,7 @@ export const MortgageDetailView: React.FC = () => {
       {/* CAPITALIZE INTEREST DIALOG */}
       <CapitalizeInterestDialog
         mortgage={mortgage}
+        currentCycleStartDate={currentCycleStartDate}
         isOpen={isCapitalizeModalOpen}
         onClose={() => setIsCapitalizeModalOpen(false)}
         onSuccess={() => {

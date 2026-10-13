@@ -81,7 +81,13 @@ export const StampScannerModal: React.FC<StampScannerModalProps> = ({
       console.error('Stamp scan failed:', err);
       const msg = err?.message || 'স্ট্যাম্প বিশ্লেষণ করতে সমস্যা হয়েছে।';
       setErrorMsg(msg);
-      if (msg.includes('API Key')) {
+      if (
+        msg.includes('API Key') ||
+        msg.includes('401') ||
+        msg.includes('403') ||
+        msg.includes('Unauthorized') ||
+        msg.includes('UNAUTHENTICATED')
+      ) {
         setShowKeyPrompt(true);
       }
     } finally {
@@ -176,16 +182,16 @@ export const StampScannerModal: React.FC<StampScannerModalProps> = ({
             </div>
             <p className="text-xs text-amber-800 leading-relaxed">
               {language === 'bn'
-                ? 'স্ট্যাম্প স্ক্যান করার জন্য Google AI Studio থেকে ফ্রি API Key প্রয়োজন।'
+                ? 'স্ট্যাম্প স্ক্যান করার জন্য Google AI Studio (aistudio.google.com) থেকে ফ্রি API Key প্রয়োজন।'
                 : 'Free Gemini API Key from Google AI Studio is required for Bengali OCR.'}
             </p>
             <div className="flex gap-2">
               <Input
                 type="text"
-                placeholder="AQ... বা AIzaSy..."
+                placeholder={language === 'bn' ? 'Gemini API Key পেস্ট করুন...' : 'Paste Gemini API Key...'}
                 value={apiKeyInput}
                 onChange={(e) => setApiKeyInput(e.target.value)}
-                className="bg-white text-xs h-9"
+                className="bg-white text-xs h-9 font-mono"
               />
               <Button
                 type="button"
@@ -193,7 +199,7 @@ export const StampScannerModal: React.FC<StampScannerModalProps> = ({
                 onClick={handleSaveApiKey}
                 className="bg-amber-600 hover:bg-amber-700 text-white shrink-0 h-9 font-bold text-xs"
               >
-                {language === 'bn' ? 'সংরক্ষণ করুন' : 'Save'}
+                {language === 'bn' ? 'সংরক্ষণ ও স্ক্যান' : 'Save & Retry'}
               </Button>
             </div>
           </div>
