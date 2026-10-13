@@ -696,7 +696,7 @@ export const SettingsPage: React.FC = () => {
                 {language === 'bn' ? 'অফিশিয়াল রিলিজ APK ফাইল' : 'Official Release APK'}
               </span>
               <span className="text-[11px] font-mono text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 inline-block">
-                app-release.apk (v1.0 • ~11.3 MB)
+                app-release.apk ({language === 'bn' ? 'আপডেটেড বিল্ড' : 'Updated Build'} • ~58 MB)
               </span>
             </div>
 
