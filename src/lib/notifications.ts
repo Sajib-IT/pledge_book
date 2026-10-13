@@ -8,8 +8,11 @@ import type { Mortgage } from '../types/database';
 import { formatBDT } from './calculations';
 
 // Updated channel ID to ensure Android recreates the channel with default sound
-export const NOTIFICATION_CHANNEL_ID = 'pledgebook_mortgage_alerts_v2';
-export const LEGACY_CHANNEL_ID = 'mortgage_reminders';
+export const NOTIFICATION_CHANNEL_ID = 'pledgebook_mortgage_alerts_v3';
+export const LEGACY_CHANNEL_IDS = [
+  'pledgebook_mortgage_alerts_v2',
+  'mortgage_reminders',
+];
 
 /**
  * Initializes the Android notification channel with high importance, vibration, and system sound.
@@ -17,11 +20,13 @@ export const LEGACY_CHANNEL_ID = 'mortgage_reminders';
  */
 export async function initNotificationChannel(): Promise<void> {
   try {
-    // Delete legacy channel that had invalid custom sound URI
-    try {
-      await LocalNotifications.deleteChannel({ id: LEGACY_CHANNEL_ID });
-    } catch {
-      // Ignored if channel doesn't exist
+    // Delete legacy channels that had locked or missing sound settings
+    for (const legacyId of LEGACY_CHANNEL_IDS) {
+      try {
+        await LocalNotifications.deleteChannel({ id: legacyId });
+      } catch {
+        // Ignored if channel doesn't exist
+      }
     }
 
     // Create the active channel with max importance and vibration
@@ -224,6 +229,7 @@ export async function scheduleMortgageNotifications(
           body: reminder.body,
           schedule: { at: scheduleDate, allowWhileIdle: true },
           channelId: NOTIFICATION_CHANNEL_ID,
+          foreground: true,
           extra: {
             mortgageId: mortgage.id,
             mortgageNo: mortgage.mortgage_no,
@@ -345,6 +351,7 @@ export async function sendTestNotification(lang: 'bn' | 'en' = 'bn'): Promise<bo
           body,
           schedule: { at: fireTime, allowWhileIdle: true },
           channelId: NOTIFICATION_CHANNEL_ID,
+          foreground: true,
           extra: {
             isTest: true,
           },
@@ -367,7 +374,7 @@ export function setupNotificationListeners(
   onNavigate?: (path: string) => void
 ): () => void {
   try {
-    const listener = LocalNotifications.addListener(
+    const actionListener = LocalNotifications.addListener(
       'localNotificationActionPerformed',
       (action) => {
         const mortgageId = action.notification.extra?.mortgageId;
@@ -377,8 +384,20 @@ export function setupNotificationListeners(
       }
     );
 
+    const receivedListener = LocalNotifications.addListener(
+      'localNotificationReceived',
+      () => {
+        // App is currently open in foreground: synthesize chime sound and vibrate
+        playNotificationSound();
+        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+          navigator.vibrate([200, 100, 200]);
+        }
+      }
+    );
+
     return () => {
-      listener.then((sub) => sub.remove()).catch(() => {});
+      actionListener.then((sub) => sub.remove()).catch(() => {});
+      receivedListener.then((sub) => sub.remove()).catch(() => {});
     };
   } catch (err) {
     console.debug('Local notification listener setup skipped or not supported on this platform:', err);
