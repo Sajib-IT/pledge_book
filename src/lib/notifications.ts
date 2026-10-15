@@ -86,6 +86,19 @@ export function playNotificationSound(): void {
     gain2.connect(ctx.destination);
     osc2.start(now + 0.12);
     osc2.stop(now + 0.55);
+
+    // Promptly close AudioContext after sound finishes.
+    // Leaving AudioContext unclosed keeps an open hardware audio stream in Android WebView,
+    // which holds Audio Focus and can cause Android to duck or mute notifications from other apps.
+    setTimeout(() => {
+      try {
+        if (ctx.state !== 'closed') {
+          ctx.close().catch(() => {});
+        }
+      } catch {
+        // Ignored
+      }
+    }, 700);
   } catch (err) {
     console.debug('Audio chime synthesis error:', err);
   }
